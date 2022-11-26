@@ -1,0 +1,55 @@
+NA<->NPC serial capture, captured by Zbigniew Stachniak Nov 24, 2022
+Curator
+York University Computer Museum
+Department of Electrical Engineering and Computer Science
+York University
+Toronto, Ontario, M3J 1P3
+Canada
+
+
+message nr  device    hex code
+[1]         NPC       $83
+             NA        $10 $06 $e4
+[2]         NPC       $82
+             NA        $10 $06
+[3]         NPC       $01
+             NA        $9f $10 $e1
+[4]         NPC       $83
+             NA        $10 $06 $e4
+[5]         NPC       $82
+             NA        $10 $06
+[6]         NPC       $01
+             NA        $9f $10 $e1
+; typing channel code
+[7]         NPC       $85
+             NA        $10 $06
+[8]         NPC       $00 $00    channel code
+             NA        $e4
+[9]         NPC       $81
+             NA        $10 $06
+[10]        NPC       $8f $05
+             NA        $e4
+; segment load request
+[11]        NPC       $84
+             NA        $10 06
+[12]        NPC       $00 $01 $00 $00       pocket number byte (0) 
+followed by segment number (lsb first)
+             NA        $e4 $91
+[13]        NPC       $10 $06
+             NA        sends a packet bytes + $10 $e1 at the end
+[14]        NPC       $84
+             NA        sendes the next segment + $10 $06
+[15]        NPC       $01 $01 $00 $00   (the first byte beinng packet nr)
+             NA        $e4 $91
+[16]        NPC       $10 $06
+             NA        packet bytes + $10 $e1 at the end
+
+.............  and so on ..................
+
+; last packet
+[175]      NPC       $10 $06
+            NA        packet bytes + $10 $e1 at the end
+[176]      NPC       $81
+            NA        $10 $06
+[177]      NPC       $0f $05
+            NA e4
