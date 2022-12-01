@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import serial
 import time
-
+from nabu_pak import NabuSegment
 
 
 # request type
@@ -24,6 +24,13 @@ import time
 # $99   Resolve Global Reference
 
 MAX_READ=65535
+
+segments = {}
+
+segment1 = NabuSegment()
+segment1.ingest_from_file("000001.PAK")
+segments[1] = segment1
+
 
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
