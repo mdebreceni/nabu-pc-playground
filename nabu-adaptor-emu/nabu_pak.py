@@ -47,9 +47,12 @@ class NabuSegment:
         self.packs[pack_id] = pack_bytes
 
     def get_pack(self, pack_id):
-        if self.packs.containsKey(pack_id):
+        print("get_pack(pack_id = {}".format(pack_id))
+        if pack_id in self.packs:
+            print("Found!")
             return self.packs[pack_id]
         else:
+            print("Not found :(")
             return None
 
     def parse_segment(self, segment_bytes):

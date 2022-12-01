@@ -23,15 +23,6 @@ from nabu_pak import NabuSegment
 # $97   Unload XIOS Module
 # $99   Resolve Global Reference
 
-MAX_READ=65535
-
-segments = {}
-
-segment1 = NabuSegment()
-segment1.ingest_from_file("000001.PAK")
-segments[1] = segment1
-
-
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
 
@@ -54,16 +45,33 @@ def handle_set_status(data):
     sendBytes(bytes([0x10, 0x06, 0xe4]))
 
 def handle_download_segment(data):
+    # ; segment load request
+    # [11]        NPC       $84
+    #              NA        $10 06
     send_ack()
-# ; segment load request
-# [11]        NPC       $84
-#              NA        $10 06
-    packetNumber=recvBytes(1)
-    print("PacketNumber: " + packetNumber.hex())
+    packetNumber=recvBytes(1)[0]
+    # packetNumber = int.from_bytes(data, byteorder="little")
+    print("PacketNumber: " + str(packetNumber))
     segmentNumber=bytes(reversed(recvBytes(3)))
-    print("SegmentNumber: " + segmentNumber.hex())
+    segmentId=str(segmentNumber.hex())
+    print("Segment ID: " + segmentId)
 
     sendBytes(bytes([0xe4, 0x91]))
+
+    response = recvBytes(2)
+    print("Response: " + response.hex(" "))
+    segment = segments[segmentId]
+    sendBytes(segment.get_pack(packetNumber))
+
+
+
+
+
+
+
+
+
+
 
 # [12]        NPC       $00 $01 $00 $00       pocket number byte (0)
 # followed by segment number (lsb first)
@@ -127,6 +135,19 @@ def recvBytes(length = None):
       print("RX " + data.hex(' '))
     return data
 
+
+######  Begin main code here
+
+
+MAX_READ=65535
+
+segments = {}
+
+segment1 = NabuSegment()
+segment1.ingest_from_file("000001.PAK")
+segments["000001"] = segment1
+
+
 ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.1)
 
 
@@ -158,7 +179,7 @@ while True:
             print("Handle 0x8f")
             handle_0x8f_req(data)
         else:
-            print("Unimplemented :(")
+            print("Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
     time.sleep(0.1)
 
@@ -200,6 +221,9 @@ while True:
 #              NA        $e4 $91
 # [13]        NPC       $10 $06
 #              NA        sends a packet bytes + $10 $e1 at the end
+
+
+
 # [14]        NPC       $84
 #              NA        sendes the next segment + $10 $06
 # [15]        NPC       $01 $01 $00 $00   (the first byte beinng packet nr)
