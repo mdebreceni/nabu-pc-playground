@@ -26,6 +26,9 @@ from nabu_pak import NabuSegment
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
 
+def handle_0x0f_request(data):
+    sendBytes(bytes([0xe4]))
+
 def handle_reset_segment_handler(data):
     sendBytes(bytes([0x10, 0x06, 0xe4]))
 
@@ -50,7 +53,6 @@ def handle_download_segment(data):
     #              NA        $10 06
     send_ack()
     packetNumber=recvBytes(1)[0]
-    # packetNumber = int.from_bytes(data, byteorder="little")
     print("PacketNumber: " + str(packetNumber))
     segmentNumber=bytes(reversed(recvBytes(3)))
     segmentId=str(segmentNumber.hex())
@@ -62,6 +64,7 @@ def handle_download_segment(data):
     print("Response: " + response.hex(" "))
     segment = segments[segmentId]
     sendBytes(segment.get_pack(packetNumber))
+    sendBytes(bytes([0x10, 0x06]))
 
 
 
@@ -102,9 +105,10 @@ def handle_set_channel_code(data):
     # when would channel code be set?  How does NPC know to do this?  How does NA respond    # if channel code is set vs. not set?
     send_ack()
     # acceptBytes([2 bytes for channel code])
-    time.sleep(0.5)
+    #    time.sleep(0.5)
 
-    channelCode = recvBytes(2)
+    # channelCode = recvBytes(2)
+    channelCode = recvBytes()
     while len(channelCode) == 0:
         print("Waiting for channel code")
         channelCode = recvBytes()
@@ -113,9 +117,12 @@ def handle_set_channel_code(data):
     channelCode = bytes(reversed(channelCode))
     print("Channel code: " + channelCode.hex())
     sendBytes(bytes([0xe4]))
+
+
     # ...
 def handle_0x8f_req(data):
     print("0x8f request")
+    data = recvBytes()
     sendBytes(bytes([0xe4]))
 
 def handle_unimplemented_req(data):
@@ -123,12 +130,13 @@ def handle_unimplemented_req(data):
     print(data.hex(' '))
 
 def sendBytes(data):
+    # time.sleep(0.1)
     print("TX " + data.hex(' '))
     ser.write(data)
 
 def recvBytes(length = None):
     if(length is None):
-      data = ser.read()
+      data = ser.read(MAX_READ)
     else:
       data = ser.read(length)
     if(len(data) > 0):
@@ -148,7 +156,7 @@ segment1.ingest_from_file("000001.PAK")
 segments["000001"] = segment1
 
 
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.1)
+ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5)
 
 
 
@@ -157,7 +165,10 @@ while True:
     if len(data) > 0:
         req_type = data[0]
 
-        if req_type == 0x80:
+        if req_type == 0x0f:
+            print("0x0f request")
+            handle_0x0f_request(data)
+        elif req_type == 0x80:
             print("Reset segment handler")
             handle_reset_segment_handler(data)
         elif req_type == 0x81:
@@ -181,7 +192,7 @@ while True:
         else:
             print("Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
-    time.sleep(0.1)
+    # time.sleep(0.1)
 
 
 
