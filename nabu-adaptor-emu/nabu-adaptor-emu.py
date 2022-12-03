@@ -36,12 +36,21 @@ def handle_reset(data):
     send_ack()
 
 def handle_get_status(data):
+    global channelCode
     send_ack()
+
     # wait for 0x01
     # expectBytes([0x01])
     response = recvBytes()
     # then send respnse
-    sendBytes(bytes([0x9f, 0x10, 0xe1]))
+    if channelCode is None:
+        print("Channel Code is not set yet.")
+        # Ask NPC to set channel code
+        sendBytes(bytes([0x9f, 0x10, 0xe1]))
+    else:
+        print("Channel code is set to " + channelCode)
+        # Report that channel code is already set
+        sendBytes(bytes([0x1f, 0x10, 0xe1]))
 
 
 def handle_set_status(data):
@@ -102,20 +111,18 @@ def handle_download_segment(data):
 
 
 def handle_set_channel_code(data):
-    # when would channel code be set?  How does NPC know to do this?  How does NA respond    # if channel code is set vs. not set?
+    global channelCode
     send_ack()
-    # acceptBytes([2 bytes for channel code])
-    #    time.sleep(0.5)
-
-    # channelCode = recvBytes(2)
-    channelCode = recvBytes()
-    while len(channelCode) == 0:
+    data = recvBytes(2)
+    while len(data) < 2:
+        remaining = 2 - len(data)
         print("Waiting for channel code")
-        channelCode = recvBytes()
+        print(data.hex(' '))
+        data = data + recvBytes(remaining)
 
-    print("Channel code: " + channelCode.hex())
-    channelCode = bytes(reversed(channelCode))
-    print("Channel code: " + channelCode.hex())
+    print("Received Channel code bytes: " + data.hex())
+    channelCode = bytes(reversed(data)).hex()
+    print("Channel code: " + channelCode)
     sendBytes(bytes([0xe4]))
 
 
@@ -148,6 +155,8 @@ def recvBytes(length = None):
 
 
 MAX_READ=65535
+channelCode = None
+
 
 segments = {}
 
@@ -186,6 +195,7 @@ while True:
         elif req_type == 0x85:
             print("Set Channel Code")
             handle_set_channel_code(data)
+            print("Channel code is now " + channelCode)
         elif req_type == 0x8f:
             print("Handle 0x8f")
             handle_0x8f_req(data)
