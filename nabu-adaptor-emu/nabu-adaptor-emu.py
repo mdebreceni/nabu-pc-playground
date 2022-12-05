@@ -78,8 +78,13 @@ def handle_download_segment(data):
 
     response = recvBytes(2)
     print("* Response from NPC: " + response.hex(" "))
+
+    # Get Segment from internal segment store
     segment = segments[segmentId]
+    # Get requested pack from that segment
     pack_data = segment.get_pack(packetNumber)
+
+    # Dump information about pack.  'pack' is otherwise unused
     pack = NabuPack()
     pack.ingest_bytes(pack_data)
     print("* Pack to send: " + pack_data.hex(' ')) 
@@ -93,9 +98,10 @@ def handle_download_segment(data):
     print("* pack_offset: " + pack.pack_offset.hex())
     print("* pack_crc: " + pack.pack_crc.hex())
     print("* pack length: {}".format(len(pack_data)))
-    
-    sendBytes(pack_data)
-    # sendBytes(bytes([0x10, 0x06]))
+
+    # escape pack data (0x10 bytes should be escaped maybe?)
+    escaped_pack_data = escapeUploadBytes(pack_data)
+    sendBytes(escaped_pack_data)
     sendBytes(bytes([0x10, 0xe1]))
 
 
@@ -159,10 +165,23 @@ def handle_unimplemented_req(data):
     print("* ??? Unimplemented request")
     print("* " + data.hex(' '))
 
+def escapeUploadBytes(data):
+    escapedBytes = bytearray()
+
+    for idx in range(len(data)):
+        byte=data[idx]
+        if(byte == 0x10):
+            escapedBytes.append(byte)
+            escapedBytes.append(byte)
+        else:
+            escapedBytes.append(byte)
+
+    return escapedBytes
+
 def sendBytes(data):
-    chunk_size=256
+    chunk_size=6
     index=0
-    delay_secs=0
+    delay_secs=0.0013
     end=len(data)
 
     while index + chunk_size < end:
@@ -189,7 +208,8 @@ def recvBytes(length = None):
 
 
 MAX_READ=65535
-channelCode = None
+# channelCode = None
+channelCode = '0000'
 
 
 segments = {}
@@ -204,7 +224,7 @@ segments["000001"] = segment1
 
 # Some hard-coded things here. 
 # TODO: Make port configurable via command line
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5)
+ser = serial.Serial(port='/dev/ttyUSB0', baudrate=111000, timeout=0.5)
 
 while True:
     data = recvBytes()
