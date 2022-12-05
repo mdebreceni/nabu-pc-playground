@@ -47,13 +47,16 @@ class NabuSegment:
         self.packs[pack_id] = pack_bytes
 
     def get_pack(self, pack_id):
-        print("get_pack(pack_id = {}".format(pack_id))
+        print("* get_pack(pack_id = {})".format(pack_id))
         if pack_id in self.packs:
-            print("Found!")
+            print("* Found!")
             return self.packs[pack_id]
         else:
-            print("Not found :(")
+            print("* Not found :(")
             return None
+
+    def get_pack_count(self):
+        return len(self.packs)
 
     def parse_segment(self, segment_bytes):
         index = 0
@@ -61,13 +64,13 @@ class NabuSegment:
             pack_length = segment_bytes[index] + segment_bytes[index + 1] * 256
             pack_id = segment_bytes[index + 5]
 
-            print("Pack length is {}".format(pack_length))
-            print("Pack ID is {}".format(pack_id))
+            print("* Pack length is {}".format(pack_length))
+            print("* Pack ID is {}".format(pack_id))
             index += 2
             pack_end = index + pack_length
-            print("Index = {}.  Pack_end = {}.".format(index, pack_end))
+            print("* Index = {}.  Pack_end = {}.".format(index, pack_end))
             pack_bytes = segment_bytes[index:pack_end]
-            print("Pack bytes: {}".format(pack_bytes.hex(' ')))
+            print("* Pack bytes: {}".format(pack_bytes.hex(' ')))
 
             self.packs[pack_id] = pack_bytes
             index += pack_length
@@ -75,7 +78,31 @@ class NabuSegment:
     def ingest_from_file(self, pakfile):
         f = open(pakfile, "rb")
         contents = bytes(f.read())
-        print(contents.hex(' '))
+        print(" * Ingesting Packs from {}:".format(pakfile) + contents.hex(' '))
         self.parse_segment(contents)
 
+class NabuPack:
+    def __init__(self):
+        pack_segment_id = None
+        pack_packnum = None
+        segment_owner = None
+        setment_tier = None
+        segment_mystery_bytes = None
+        pack_type = None
+        pack_number = None
+        pack_offset = None
+        pack_crc = None
+        pack_bytes = None
+
+    def ingest_bytes(self, pack_bytes):
+        self.pack_segment_id = bytes(pack_bytes[0:3])
+        self.pack_packnum = bytes(pack_bytes[3:4])
+        self.segment_owner = bytes(pack_bytes[4:5])
+        self.segment_tier = bytes(pack_bytes[5:9])
+        self.segment_mystery_bytes = bytes(pack_bytes[9:11])
+        self.pack_type = bytes(pack_bytes[11:12])
+        self.pack_number = bytes(pack_bytes[12:14])
+        self.pack_offset = bytes(pack_bytes[14:16])
+        self.pack_crc = bytes(pack_bytes[-2:])
+        self.pack_bytes = pack_bytes
 

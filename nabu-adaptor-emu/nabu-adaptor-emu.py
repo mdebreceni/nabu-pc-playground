@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import serial
 import time
-from nabu_pak import NabuSegment
+from nabu_pak import NabuSegment, NabuPack
 
 
 # request type
 # Others (from http://dunfield.classiccmp.org/nabu/nabutech.pdf,
 # Segment Routines  Page 9 - 3
+# 
 # $80   Reset Segment Handler (Resets Adaptor to known state)
 #       (also see Page 2 - 14)
 # $81   Reset (?)
@@ -26,7 +27,13 @@ from nabu_pak import NabuSegment
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
 
+def handle_0xf0_request(data):
+    sendBytes(bytes([0xe4]))
+
 def handle_0x0f_request(data):
+    sendBytes(bytes([0xe4]))
+
+def handle_0x03_request(data):
     sendBytes(bytes([0xe4]))
 
 def handle_reset_segment_handler(data):
@@ -44,11 +51,11 @@ def handle_get_status(data):
     response = recvBytes()
     # then send respnse
     if channelCode is None:
-        print("Channel Code is not set yet.")
+        print("* Channel Code is not set yet.")
         # Ask NPC to set channel code
         sendBytes(bytes([0x9f, 0x10, 0xe1]))
     else:
-        print("Channel code is set to " + channelCode)
+        print("* Channel code is set to " + channelCode)
         # Report that channel code is already set
         sendBytes(bytes([0x1f, 0x10, 0xe1]))
 
@@ -62,18 +69,34 @@ def handle_download_segment(data):
     #              NA        $10 06
     send_ack()
     packetNumber=recvBytes(1)[0]
-    print("PacketNumber: " + str(packetNumber))
     segmentNumber=bytes(reversed(recvBytes(3)))
     segmentId=str(segmentNumber.hex())
-    print("Segment ID: " + segmentId)
+    print("* Requested Segment ID: " + segmentId)
+    print("* Requested PacketNumber: " + str(packetNumber))
 
     sendBytes(bytes([0xe4, 0x91]))
 
     response = recvBytes(2)
-    print("Response: " + response.hex(" "))
+    print("* Response from NPC: " + response.hex(" "))
     segment = segments[segmentId]
-    sendBytes(segment.get_pack(packetNumber))
-    sendBytes(bytes([0x10, 0x06]))
+    pack_data = segment.get_pack(packetNumber)
+    pack = NabuPack()
+    pack.ingest_bytes(pack_data)
+    print("* Pack to send: " + pack_data.hex(' ')) 
+    print("* pack_segment_id: "+ pack.pack_segment_id.hex())
+    print("* pack_packnum: " + pack.pack_packnum.hex())
+    print("* segment_owner: " + pack.segment_owner.hex())
+    print("* segment_tier: " + pack.segment_tier.hex())
+    print("* segment_mystery_bytes: " + pack.segment_mystery_bytes.hex())
+    print("* pack type: " + pack.pack_type.hex())
+    print("* pack_number: " + pack.pack_number.hex())
+    print("* pack_offset: " + pack.pack_offset.hex())
+    print("* pack_crc: " + pack.pack_crc.hex())
+    print("* pack length: {}".format(len(pack_data)))
+    
+    sendBytes(pack_data)
+    # sendBytes(bytes([0x10, 0x06]))
+    sendBytes(bytes([0x10, 0xe1]))
 
 
 
@@ -120,34 +143,45 @@ def handle_set_channel_code(data):
         print(data.hex(' '))
         data = data + recvBytes(remaining)
 
-    print("Received Channel code bytes: " + data.hex())
+    print("* Received Channel code bytes: " + data.hex())
     channelCode = bytes(reversed(data)).hex()
-    print("Channel code: " + channelCode)
+    print("* Channel code: " + channelCode)
     sendBytes(bytes([0xe4]))
 
 
     # ...
 def handle_0x8f_req(data):
-    print("0x8f request")
+    print("* 0x8f request")
     data = recvBytes()
     sendBytes(bytes([0xe4]))
 
 def handle_unimplemented_req(data):
-    print("???")
-    print(data.hex(' '))
+    print("* ??? Unimplemented request")
+    print("* " + data.hex(' '))
 
 def sendBytes(data):
-    # time.sleep(0.1)
-    print("TX " + data.hex(' '))
-    ser.write(data)
+    chunk_size=256
+    index=0
+    delay_secs=0
+    end=len(data)
+
+    while index + chunk_size < end:
+        ser.write(data[index:index+chunk_size])
+        print("NA-->NPC:  " + data[index:index+chunk_size].hex(' '))
+        index += chunk_size
+        time.sleep(delay_secs)
+
+    if index != end:
+        print("NA-->NPC:  " + data[index:end].hex(' '))
+        ser.write(data[index:end])
 
 def recvBytes(length = None):
     if(length is None):
-      data = ser.read(MAX_READ)
+        data = ser.read(MAX_READ)
     else:
-      data = ser.read(length)
+        data = ser.read(length)
     if(len(data) > 0):
-      print("RX " + data.hex(' '))
+        print("NPC-->NA:   " + data.hex(' '))
     return data
 
 
@@ -160,49 +194,58 @@ channelCode = None
 
 segments = {}
 
+print("* Loading NABU Segments into memory")
 segment1 = NabuSegment()
+
+# Crude implementation - we could probably scan a directory for files here.
 segment1.ingest_from_file("000001.PAK")
 segments["000001"] = segment1
 
 
+# Some hard-coded things here. 
+# TODO: Make port configurable via command line
 ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5)
-
-
 
 while True:
     data = recvBytes()
     if len(data) > 0:
         req_type = data[0]
 
-        if req_type == 0x0f:
-            print("0x0f request")
+        if req_type == 0x03:
+            print("* 0x03 request")
+            handle_0x03_request(data)
+        elif req_type == 0x0f:
+            print("* 0x0f request")
             handle_0x0f_request(data)
+        elif req_type == 0xf0:
+            print("* 0xf0 request")
+            handle_0xf0_request(data)
         elif req_type == 0x80:
-            print("Reset segment handler")
+            print("* Reset segment handler")
             handle_reset_segment_handler(data)
         elif req_type == 0x81:
-            print("Reset")
+            print("* Reset")
             handle_reset(data)
         elif req_type == 0x82:
-            print("Get Status")
+            print("* Get Status")
             handle_get_status(data)
         elif req_type == 0x83:
-            print("Set Status")
+            print("* Set Status")
             handle_set_status(data)
         elif req_type == 0x84:
-            print("Download Segment Request")
+            print("* Download Segment Request")
             handle_download_segment(data)
         elif req_type == 0x85:
-            print("Set Channel Code")
+            print("* Set Channel Code")
             handle_set_channel_code(data)
-            print("Channel code is now " + channelCode)
+            print("* Channel code is now " + channelCode)
         elif req_type == 0x8f:
-            print("Handle 0x8f")
+            print("* Handle 0x8f")
             handle_0x8f_req(data)
         else:
-            print("Req type {} is Unimplemented :(".format(data[0]))
+            print("* Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
-    # time.sleep(0.1)
+    time.sleep(0.1)
 
 
 
