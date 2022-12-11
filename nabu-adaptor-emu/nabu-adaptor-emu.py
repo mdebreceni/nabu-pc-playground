@@ -68,8 +68,8 @@ def handle_download_segment(data):
     # [11]        NPC       $84
     #              NA        $10 06
     send_ack()
-    packetNumber=recvBytes(1)[0]
-    segmentNumber=bytes(reversed(recvBytes(3)))
+    packetNumber=recvBytesExactLen(1)[0]
+    segmentNumber=bytes(reversed(recvBytesExactLen(3)))
     segmentId=str(segmentNumber.hex())
     print("* Requested Segment ID: " + segmentId)
     print("* Requested PacketNumber: " + str(packetNumber))
@@ -80,7 +80,11 @@ def handle_download_segment(data):
     print("* Response from NPC: " + response.hex(" "))
 
     # Get Segment from internal segment store
-    segment = segments[segmentId]
+    if segmentId in segments:
+        segment = segments[segmentId]
+    else:
+        return None
+   
     # Get requested pack from that segment
     pack_data = segment.get_pack(packetNumber)
 
@@ -142,7 +146,7 @@ def handle_download_segment(data):
 def handle_set_channel_code(data):
     global channelCode
     send_ack()
-    data = recvBytes(2)
+    data = recvBytesExactLen(2)
     while len(data) < 2:
         remaining = 2 - len(data)
         print("Waiting for channel code")
@@ -181,18 +185,30 @@ def escapeUploadBytes(data):
 def sendBytes(data):
     chunk_size=6
     index=0
-    delay_secs=0.0013
+    delay_secs=0.002  #0.0025
     end=len(data)
 
     while index + chunk_size < end:
         ser.write(data[index:index+chunk_size])
-        print("NA-->NPC:  " + data[index:index+chunk_size].hex(' '))
+#        print("NA-->NPC:  " + data[index:index+chunk_size].hex(' '))
         index += chunk_size
         time.sleep(delay_secs)
 
     if index != end:
-        print("NA-->NPC:  " + data[index:end].hex(' '))
+#        print("NA-->NPC:  " + data[index:end].hex(' '))
         ser.write(data[index:end])
+
+def recvBytesExactLen(length=None):
+    if(length is None):
+        return None
+    data = recvBytes(length)
+    while len(data) < length:
+        remaining = length - len(data)
+#        print("Waiting for {} more bytes".format(length - len(data)))
+        print(data.hex(' '))
+        time.sleep(0.01)
+        data = data + recvBytes(remaining)
+    return data
 
 def recvBytes(length = None):
     if(length is None):
@@ -224,7 +240,7 @@ segments["000001"] = segment1
 
 # Some hard-coded things here. 
 # TODO: Make port configurable via command line
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=111000, timeout=0.5)
+ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5)
 
 while True:
     data = recvBytes()
@@ -265,7 +281,7 @@ while True:
         else:
             print("* Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
-    time.sleep(0.1)
+    time.sleep(0.15)
 
 
 
