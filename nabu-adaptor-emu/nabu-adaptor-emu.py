@@ -185,7 +185,7 @@ def escapeUploadBytes(data):
 def sendBytes(data):
     chunk_size=6
     index=0
-    delay_secs=0.002  #0.0025
+    delay_secs=0
     end=len(data)
 
     while index + chunk_size < end:
@@ -240,7 +240,7 @@ segments["000001"] = segment1
 
 # Some hard-coded things here. 
 # TODO: Make port configurable via command line
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5)
+ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5, stopbits=serial.STOPBITS_TWO)
 
 while True:
     data = recvBytes()
@@ -281,8 +281,6 @@ while True:
         else:
             print("* Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
-    time.sleep(0.15)
-
 
 
 
