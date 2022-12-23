@@ -177,9 +177,11 @@ int vdp_init(uint8_t mode, uint8_t color, bool big_sprites, bool magnify) {
     setRegister(2, 0x05); // Name table at 0x1400
     // setRegister(3, 0xFF); // Color table not available
     setRegister(4, 0x01); // Pattern table start at 0x800
-    setRegister(5, 0x76); // Sprite Attribute table at 0x1000
-    setRegister(6, 0x03); // Sprites Pattern Table at 0x0
+    setRegister(5, 0x76); // Sprite Attribute table at 0x3b00
+    setRegister(6, 0x03); // Sprites Pattern Table at 0x1800
     _pattern_table = 0x800;
+    _sprite_attribute_table = 0x3b00;
+    _sprite_pattern_table = 0x1800;
     _name_table = 0x1400;
     setWriteAddress(_name_table); // Init name table
 
@@ -353,7 +355,7 @@ uint16_t vdp_sprite_init(uint8_t name, uint8_t priority, uint8_t color) {
   if (_sprite_size_sel)
     writeByteToVRAM(4 * name);
   else
-    writeByteToVRAM(4 * name);
+    writeByteToVRAM(name);
 
   writeByteToVRAM(0x80 | (color & 0xF));
 
