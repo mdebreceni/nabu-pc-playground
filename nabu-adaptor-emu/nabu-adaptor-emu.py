@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
+# 
+# NABU Adaptor Emulator - Copyright Mike Debreceni - 2022
+# 
+# Usage:   python3 ./nabu-adaptor-emu.py
+# 
+# This only supports a single NABU program, saved as '000001.PAK'.
+# 
+
+
 import serial
 import time
 from nabu_pak import NabuSegment, NabuPack
-
 
 # request type
 # Others (from http://dunfield.classiccmp.org/nabu/nabutech.pdf,
@@ -24,10 +32,14 @@ from nabu_pak import NabuSegment, NabuPack
 # $97   Unload XIOS Module
 # $99   Resolve Global Reference
 
+
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
 
-def handle_0xf0_request(data):
+# TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
+# TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
+
+def handle_0xf0_request(data):  
     sendBytes(bytes([0xe4]))
 
 def handle_0x0f_request(data):
@@ -46,10 +58,7 @@ def handle_get_status(data):
     global channelCode
     send_ack()
 
-    # wait for 0x01
-    # expectBytes([0x01])
     response = recvBytes()
-    # then send respnse
     if channelCode is None:
         print("* Channel Code is not set yet.")
         # Ask NPC to set channel code
@@ -58,7 +67,6 @@ def handle_get_status(data):
         print("* Channel code is set to " + channelCode)
         # Report that channel code is already set
         sendBytes(bytes([0x1f, 0x10, 0xe1]))
-
 
 def handle_set_status(data):
     sendBytes(bytes([0x10, 0x06, 0xe4]))
@@ -108,41 +116,6 @@ def handle_download_segment(data):
     sendBytes(escaped_pack_data)
     sendBytes(bytes([0x10, 0xe1]))
 
-
-
-
-
-
-
-
-
-
-
-# [12]        NPC       $00 $01 $00 $00       pocket number byte (0)
-# followed by segment number (lsb first)
-#              NA        $e4 $91
-# [13]        NPC       $10 $06
-#              NA        sends a packet bytes + $10 $e1 at the end
-# [14]        NPC       $84
-#              NA        sendes the next segment + $10 $06
-# [15]        NPC       $01 $01 $00 $00   (the first byte beinng packet nr)
-#              NA        $e4 $91
-# [16]        NPC       $10 $06
-#              NA        packet bytes + $10 $e1 at the end
-
-# .............  and so on ..................
-#
-# ; last packet
-# [175]      NPC       $10 $06
-#             NA        packet bytes + $10 $e1 at the end
-# [176]      NPC       $81
-#             NA        $10 $06
-# [177]      NPC       $0f $05
-#             NA e4
-
-
-
-
 def handle_set_channel_code(data):
     global channelCode
     send_ack()
@@ -158,8 +131,6 @@ def handle_set_channel_code(data):
     print("* Channel code: " + channelCode)
     sendBytes(bytes([0xe4]))
 
-
-    # ...
 def handle_0x8f_req(data):
     print("* 0x8f request")
     data = recvBytes()
@@ -234,9 +205,11 @@ print("* Loading NABU Segments into memory")
 segment1 = NabuSegment()
 
 # Crude implementation - we could probably scan a directory for files here.
+# TODO: The PAK file is pre-split into individual packets, each with headers and checksums. 
+# TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
+# 
 segment1.ingest_from_file("000001.PAK")
 segments["000001"] = segment1
-
 
 # Some hard-coded things here. 
 # TODO: Make port configurable via command line
@@ -282,59 +255,3 @@ while True:
             print("* Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
 
-
-
-# ; message nr  device    hex code
-# [1]         NPC       $83
-#              NA        $10 $06 $e4
-
-# [2]         NPC       $82
-#              NA        $10 $06
-# [3]         NPC       $01
-#              NA        $9f $10 $e1
-
-# [4]         NPC       $83
-#              NA        $10 $06 $e4
-
-# [5]         NPC       $82
-#              NA        $10 $06
-# [6]         NPC       $01
-#              NA        $9f $10 $e1
-
-
-# ; typing channel code
-# [7]         NPC       $85
-#              NA        $10 $06
-# [8]         NPC       $00 $00    channel code
-#              NA        $e4
-# [9]         NPC       $81
-#              NA        $10 $06
-# [10]        NPC       $8f $05
-#              NA        $e4
-# ; segment load request
-# [11]        NPC       $84
-#              NA        $10 06
-# [12]        NPC       $00 $01 $00 $00       pocket number byte (0)
-# followed by segment number (lsb first)
-#              NA        $e4 $91
-# [13]        NPC       $10 $06
-#              NA        sends a packet bytes + $10 $e1 at the end
-
-
-
-# [14]        NPC       $84
-#              NA        sendes the next segment + $10 $06
-# [15]        NPC       $01 $01 $00 $00   (the first byte beinng packet nr)
-#              NA        $e4 $91
-# [16]        NPC       $10 $06
-#              NA        packet bytes + $10 $e1 at the end
-#
-# .............  and so on ..................
-#
-# ; last packet
-# [175]      NPC       $10 $06
-#             NA        packet bytes + $10 $e1 at the end
-# [176]      NPC       $81
-#             NA        $10 $06
-# [177]      NPC       $0f $05
-#             NA e4
