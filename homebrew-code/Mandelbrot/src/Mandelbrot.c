@@ -1,3 +1,13 @@
+// Mandelbrot.c - Render the Mandelbrot Set with a NABU PC in 64 x 48 multicolor mode
+// Copyright Mike Debreceni 2022
+// 
+//
+// Based on Hello World C example from NABU.ca Homebrew
+// 
+// https://nabu.ca/homebrew-c-tutorial
+// https://cloud.nabu.ca/homebrew/Hello-World-C.zip
+
+
 static void orgit() __naked {
   __asm
   org     0x140D
