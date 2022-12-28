@@ -1,0 +1,4 @@
+# Required Python packages
+# pip install -r requirements.txt
+argparse
+pyserial
