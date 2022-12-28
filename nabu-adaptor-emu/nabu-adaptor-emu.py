@@ -2,12 +2,16 @@
 # 
 # NABU Adaptor Emulator - Copyright Mike Debreceni - 2022
 # 
-# Usage:   python3 ./nabu-adaptor-emu.py
+# Usage:   python3 ./nabu-adaptor-emu.py [--baudrate BAUDRATE] TTYNAME
+#
+# Example:
+#          python3 ./nabu-adaptor-emu.py --baudrate=111863 /dev/ttyUSB0
+#
 # 
 # This only supports a single NABU program, saved as '000001.PAK'.
 # 
 
-
+import argparse
 import serial
 import time
 from nabu_pak import NabuSegment, NabuPack
@@ -195,9 +199,27 @@ def recvBytes(length = None):
 
 
 MAX_READ=65535
+DEFAULT_BAUDRATE=111863
 # channelCode = None
 channelCode = '0000'
 
+parser = argparse.ArgumentParser()
+# Positional argument for ttyname - required
+parser.add_argument("ttyname",
+        help="Set serial device (e.g. /dev/ttyUSB0)")
+# Optional argument for baudrate
+parser.add_argument("-b", "--baudrate",
+        type=int,
+        help="Set serial baud rate (default: {} BPS)".format(DEFAULT_BAUDRATE),
+        default=DEFAULT_BAUDRATE)
+args = parser.parse_args()
+
+if args.ttyname is None:
+    parser.print_help()
+    exit(1)
+
+# Some hard-coded things here (timeout, stopbits)
+ser = serial.Serial(port=args.ttyname, baudrate=args.baudrate, timeout=0.5, stopbits=serial.STOPBITS_TWO)
 
 segments = {}
 
@@ -210,10 +232,6 @@ segment1 = NabuSegment()
 # 
 segment1.ingest_from_file("000001.PAK")
 segments["000001"] = segment1
-
-# Some hard-coded things here. 
-# TODO: Make port configurable via command line
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5, stopbits=serial.STOPBITS_TWO)
 
 while True:
     data = recvBytes()
