@@ -264,6 +264,8 @@ loadpak("000001")
 # TODO: The PAK file is pre-split into individual packets, each with headers and checksums. 
 # TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
 # 
+loadpak("000001")
+
 
 while True:
     data = recvBytes()
