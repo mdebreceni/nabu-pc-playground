@@ -4,8 +4,10 @@
 # 
 # Usage:   python3 ./nabu-adaptor-emu.py
 # 
-# This only supports a single NABU program, saved as '000001.PAK'.
-# 
+# Ugly hack to make this work with directory of pak files from a cycle added by Sark
+# There is a better way to do this, I'm sure of it. But this works (mostly)
+# This works with a directory of pak files, in paks/
+# menu is 000001.pak, other files all upercase hex names with .pak extension
 
 
 import serial
@@ -35,6 +37,12 @@ from nabu_pak import NabuSegment, NabuPack
 
 def send_ack():
     sendBytes(bytes([0x10, 0x06]))
+
+# Pre-formed time packet, sends Jan 1 1984 at 00:00:00
+# Todo - add proper time packet generation and CRC 
+
+def send_time():
+    sendBytes(bytes([0x7f, 0xff, 0xff, 0x00, 0x01, 0x7f, 0xff, 0xff, 0xff, 0x7f, 0x80, 0x20, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x02, 0x54, 0x01, 0x01, 0x00, 0x00, 0x00, 0xc6, 0x3a]))
 
 # TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
 # TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
@@ -81,40 +89,51 @@ def handle_download_segment(data):
     segmentId=str(segmentNumber.hex())
     print("* Requested Segment ID: " + segmentId)
     print("* Requested PacketNumber: " + str(packetNumber))
+    if segmentId != "7fffff" and segmentId != loadedpak:
+        loadpak(segmentId)
+        sendBytes(bytes([0x91]))
+    else:
+        if segmentId == "7fffff":
+            print("Time packet requested")
+            sendBytes(bytes([0xe4, 0x91]))
+            segmentId == ""
+        else:
+            sendBytes(bytes([0xe4, 0x91]))
 
-    sendBytes(bytes([0xe4, 0x91]))
-
-    response = recvBytes(2)
-    print("* Response from NPC: " + response.hex(" "))
+            response = recvBytes(2)
+            print("* Response from NPC: " + response.hex(" "))
+            print("segmentId", segmentId)
+            print("packetnumber", packetNumber)
+            print("segments", segments)
 
     # Get Segment from internal segment store
-    if segmentId in segments:
-        segment = segments[segmentId]
-    else:
-        return None
-   
-    # Get requested pack from that segment
-    pack_data = segment.get_pack(packetNumber)
+            if segmentId in segments:
+                segment = segments[segmentId]
+            else:
+                return None
+
+        # Get requested pack from that segment
+            pack_data = segment.get_pack(packetNumber)
 
     # Dump information about pack.  'pack' is otherwise unused
-    pack = NabuPack()
-    pack.ingest_bytes(pack_data)
-    print("* Pack to send: " + pack_data.hex(' ')) 
-    print("* pack_segment_id: "+ pack.pack_segment_id.hex())
-    print("* pack_packnum: " + pack.pack_packnum.hex())
-    print("* segment_owner: " + pack.segment_owner.hex())
-    print("* segment_tier: " + pack.segment_tier.hex())
-    print("* segment_mystery_bytes: " + pack.segment_mystery_bytes.hex())
-    print("* pack type: " + pack.pack_type.hex())
-    print("* pack_number: " + pack.pack_number.hex())
-    print("* pack_offset: " + pack.pack_offset.hex())
-    print("* pack_crc: " + pack.pack_crc.hex())
-    print("* pack length: {}".format(len(pack_data)))
+            pack = NabuPack()
+            pack.ingest_bytes(pack_data)
+            print("* Pack to send: " + pack_data.hex(' ')) 
+            print("* pack_segment_id: "+ pack.pack_segment_id.hex())
+            print("* pack_packnum: " + pack.pack_packnum.hex())
+            print("* segment_owner: " + pack.segment_owner.hex())
+            print("* segment_tier: " + pack.segment_tier.hex())
+            print("* segment_mystery_bytes: " + pack.segment_mystery_bytes.hex())
+            print("* pack type: " + pack.pack_type.hex())
+            print("* pack_number: " + pack.pack_number.hex())
+            print("* pack_offset: " + pack.pack_offset.hex())
+            print("* pack_crc: " + pack.pack_crc.hex())
+            print("* pack length: {}".format(len(pack_data)))
 
     # escape pack data (0x10 bytes should be escaped maybe?)
-    escaped_pack_data = escapeUploadBytes(pack_data)
-    sendBytes(escaped_pack_data)
-    sendBytes(bytes([0x10, 0xe1]))
+            escaped_pack_data = escapeUploadBytes(pack_data)
+            sendBytes(escaped_pack_data)
+            sendBytes(bytes([0x10, 0xe1]))
 
 def handle_set_channel_code(data):
     global channelCode
@@ -190,30 +209,34 @@ def recvBytes(length = None):
         print("NPC-->NA:   " + data.hex(' '))
     return data
 
+# Loads pak from file, assumes file names are all upper case with a lower case .pak extension
+# Assumes all pak files are in a directory called paks/
+# 000001.pak from cycle 2 needs to have the last 16 bytes of 1A's stripped off
+# 000001.pak from cycle 1 is horribly corrupt and dosen't work
+
+def loadpak(filename):
+    file = filename.upper()
+    global segments 
+    segments = {}
+    print("* Loading NABU Segments into memory")
+    global segment1
+    segment1 = NabuSegment()
+    segment1.ingest_from_file( "paks/"+ file + ".pak")
+    segments[filename] = segment1
+    global loadedpak
+    loadedpak = filename
 
 ######  Begin main code here
-
 
 MAX_READ=65535
 # channelCode = None
 channelCode = '0000'
 
-
-segments = {}
-
-print("* Loading NABU Segments into memory")
-segment1 = NabuSegment()
-
-# Crude implementation - we could probably scan a directory for files here.
-# TODO: The PAK file is pre-split into individual packets, each with headers and checksums. 
-# TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
-# 
-segment1.ingest_from_file("000001.PAK")
-segments["000001"] = segment1
+loadpak("000001")
 
 # Some hard-coded things here. 
 # TODO: Make port configurable via command line
-ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=0.5, stopbits=serial.STOPBITS_TWO)
+ser = serial.Serial(port='/dev/ttyUSB0', baudrate=111865, timeout=0.5, stopbits=serial.STOPBITS_TWO)
 
 while True:
     data = recvBytes()
@@ -251,6 +274,11 @@ while True:
         elif req_type == 0x8f:
             print("* Handle 0x8f")
             handle_0x8f_req(data)
+        elif req_type == 0x10:
+            print("got request type 10, sending time")
+            send_time()
+            sendBytes(bytes([0x10, 0xe1]))
+
         else:
             print("* Req type {} is Unimplemented :(".format(data[0]))
             handle_unimplemented_req(data)
