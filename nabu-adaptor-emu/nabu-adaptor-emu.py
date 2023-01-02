@@ -21,15 +21,19 @@ from nabu_pak import NabuSegment, NabuPack
 from twisted.internet.protocol import Factory
 from twisted.internet.endpoints import TCP4ServerEndpoint
 from twisted.protocols.basic import LineReceiver
+from twisted.internet import defer
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet import reactor
 
 
-NABU_STATE_WAIT_FOR_REQ = 0
-NABU_STATE_WAIT_FOR_DATA = 1
+NABU_STATE_AWAITING_REQ = 0
+NABU_STATE_PROCESSING_REQ = 1
+MAX_READ=65535
 
 class NabuAdaptorFactory(Factory):
     def __init__(self):
         print("NabuAdaptorFactory::__init__")
+        read_limit = MAX_READ
         return
 
     def buildProtocol(self, addr):
@@ -58,9 +62,12 @@ class NabuAdaptorFactory(Factory):
 
 class NabuAdaptor(LineReceiver):
     def __init__(self):
-        self.state=NABU_STATE_WAIT_FOR_REQ
         print("Called NabuAdaptor::__init__")
         self.setRawMode()
+        self.read_limit = MAX_READ
+        self.d = None
+        self.read_buffer = bytearray(b'')
+        self.state = NABU_STATE_AWAITING_REQ
 
     def connectionMade(self):
         print("Got a connection. Yay!")
@@ -68,14 +75,40 @@ class NabuAdaptor(LineReceiver):
     def connectionLost(self, reason):
         print("Lost connection. Boo!")
 
-    def rawDataReceived(self, data):
-        if self.state==NABU_STATE_WAIT_FOR_REQ:
-            self.handle_NabuRequest(data)
+    def readBuffered(self):
+        print("readBuffered")
+        read_len = len(self.read_buffer)
+        print("readBuffered: read_len is {}".format(read_len))
+        data = None
+        if read_len > self.read_limit:
+            read_len = self.read_limit
+            data = self.read_buffer[0:read_len]
+            self.read_buffer = self.read_buffer[read_len:]
         else:
-            self.handle_callback(data)
+            data = self.read_buffer
+            self.read_buffer = bytearray(b'')
+        return data
 
-    def handle_callBack(self):
-        pass
+    def rawDataReceived(self, data):
+        print(type(data))
+        print("(rawDataReceived) NPC-->NA:   " + data.hex(' '))
+
+        if self.state == NABU_STATE_PROCESSING_REQ:
+            print("State: NABU_STATE_PROCESSING_REQ")
+            self.read_buffer += data
+            print("readBuffer" + self.read_buffer.hex(' '))
+            if(self.d is not None):
+                print("Yay - we have a callback")
+                cb_data = self.readBuffered()
+                self.d.callback(cb_data)
+                self.d = None
+            else:
+                print("ZBooo.  no callback")
+        else:
+            print("State: NABU_STATE_AWAITING_REQ - just got REQ")
+            self.state=NABU_STATE_PROCESSING_REQ
+            self.handle_NabuRequest(data)
+
 
     def handle_NabuRequest(self, data):
         if len(data) > 0:
@@ -119,6 +152,8 @@ class NabuAdaptor(LineReceiver):
             else:
                 print("* Req type {} is Unimplemented :(".format(data[0]))
                 self.handle_unimplemented_req(data)
+
+        self.state=NABU_STATE_AWAITING_REQ
     
     def send_ack(self):
         self.sendBytes(bytes([0x10, 0x06]))
@@ -150,8 +185,10 @@ class NabuAdaptor(LineReceiver):
     def handle_get_status(self, data):
         global channelCode
         self.send_ack()
-
         response = self.recvBytes()
+        print("Response is of type {}".format(type(response)))
+        print("Len(response) = {}".format(len(response)))
+        print("Sent ack")
         if channelCode is None:
             print("* Channel Code is not set yet.")
             # Ask NPC to set channel code
@@ -222,7 +259,7 @@ class NabuAdaptor(LineReceiver):
 
     def handle_set_channel_code(self, data):
         global channelCode
-        send_ack()
+        self.send_ack()
         data = self.recvBytesExactLen(2)
         while len(data) < 2:
             remaining = 2 - len(data)
@@ -265,35 +302,71 @@ class NabuAdaptor(LineReceiver):
 
         while index + chunk_size < end:
             self.transport.write(data[index:index+chunk_size])
-    #        print("NA-->NPC:  " + data[index:index+chunk_size].hex(' '))
+            print("NA-->NPC:  " + data[index:index+chunk_size].hex(' '))
             index += chunk_size
             time.sleep(delay_secs)
 
         if index != end:
-    #        print("NA-->NPC:  " + data[index:end].hex(' '))
+            print("NA-->NPC:  " + data[index:end].hex(' '))
             self.transport.write(data[index:end])
 
     def recvBytesExactLen(self, length=None):
         if(length is None):
             return None
         data = self.recvBytes(length)
+
         while len(data) < length:
             remaining = length - len(data)
-    #        print("Waiting for {} more bytes".format(length - len(data)))
+            print("Waiting for {} more bytes".format(length - len(data)))
             print(data.hex(' '))
             time.sleep(0.01)
             data = data + self.recvBytes(remaining)
         return data
 
+#    def awaitBytes(self, length):
+#        self.read_limit = length;
+#        self.d = defer.Deferred()
+#        print("in awaitBytes(): self.d has type {}".format(type(self.d)))
+#        return self.d
+
+    def get_cb_data(self, cb_data):
+        print("get_cb_data was called!")
+        return cb_data
+
+
+    @defer.inlineCallbacks
+    def readAsyncUsingYield(self, length):
+        print("readAsyncUsingYield")
+        self.d = twisted.internet.defer.Deferred()
+        self.read_limit = length
+        # defer.Deferred()
+        print("self.d is of type {}".format(self.d))
+        self.d.addCallback(self.get_cb_data())
+        print("self.d.added_callback()")
+        data = yield self.d
+
+        defer.returnValue(data)
+
+
     def recvBytes(self, length = None):
         if(length is None):
-            data = self.transport.read(MAX_READ)
+            length = MAX_READ
+        if(len(self.read_buffer) > 0):
+            print("Reading synchronously (length = {})".format(length))
+            self.read_limit = length
+            data = self.readBuffered()
         else:
-            data = self.transport.read(length)
+            data = yield self.readAsyncUsingYield(length)
+            print("Data has type {}".format(type(data)))
+            print("returnValue happened")
+
         if(len(data) > 0):
             print("NPC-->NA:   " + data.hex(' '))
+        
         return data
 
+    def readAsync(self, length):
+        self.read_limit = length
 
 
 
@@ -316,7 +389,6 @@ def loadpak(filename):
 
 ######  Begin main code here
 
-MAX_READ=65535
 DEFAULT_BAUDRATE=111863
 # channelCode = None
 channelCode = '0000'
