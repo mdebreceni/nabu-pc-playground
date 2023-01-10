@@ -16,8 +16,9 @@
 import argparse
 import serial
 import time
+import datetime
 from nabu_pak import NabuSegment, NabuPack
-
+from crccheck.crc import Crc16Genibus
 import asyncio
 
 NABU_STATE_AWAITING_REQ = 0
@@ -107,8 +108,26 @@ class NabuAdaptor():
     # Pre-formed time packet, sends Jan 1 1984 at 00:00:00
     # Todo - add proper time packet generation and CRC 
 
+    def get_time_bytes(self):
+        data = bytearray([0x7f, 0xff, 0xff, 0x00, 0x01, 0x7f, 0xff, 0xff, 0xff, 0x7f, 0x80, 0x20, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02])
+        now = time.localtime()
+        data.append(now.tm_wday + 2)  # 2 seems to be the correct offset, if 1=Sun, 2=Mon, 3=Tue, etc...
+        data.append(0x54) # This is 1984, forever
+        data.append(now.tm_mon)
+        data.append(now.tm_mday)
+        data.append(now.tm_hour)
+        data.append(now.tm_min)
+        data.append(now.tm_sec)
+        crc = Crc16Genibus.calc(data)   # Empirically gives us the right CRC
+        data.append(crc >> 8 & 0xff)
+        data.append(crc & 0xff)
+        return bytes(data)
+
     async def send_time(self):
-        await self.sendBytes(bytes([0x7f, 0xff, 0xff, 0x00, 0x01, 0x7f, 0xff, 0xff, 0xff, 0x7f, 0x80, 0x20, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x02, 0x54, 0x01, 0x01, 0x00, 0x00, 0x00, 0xc6, 0x3a]))
+        time_bytes = self.get_time_bytes()
+        escaped_time_bytes = self.escapeUploadBytes(time_bytes)
+        await self.sendBytes(escaped_time_bytes)
+
 
     # TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
     # TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
@@ -172,9 +191,16 @@ class NabuAdaptor():
                 print("Time packet requested")
                 await self.sendBytes(bytes([0xe4, 0x91]))
                 segmentId == ""
+                response = await self.recvBytesExactLen(2)
+                print("* Response from NPC: " + response.hex(" "))
+                print("segmentId", segmentId)
+                print("packetnumber", packetNumber)
+                print("segments", segments)
+                await self.send_time()
+                await self.sendBytes(bytes([0x10, 0xe1]))
+
             else:
                 await self.sendBytes(bytes([0xe4, 0x91]))
-
                 response = await self.recvBytesExactLen(2)
                 print("* Response from NPC: " + response.hex(" "))
                 print("segmentId", segmentId)
