@@ -20,6 +20,7 @@ import datetime
 from nabu_pak import NabuSegment, NabuPack
 from crccheck.crc import Crc16Genibus
 import asyncio
+import serial_asyncio
 
 NABU_STATE_AWAITING_REQ = 0
 NABU_STATE_PROCESSING_REQ = 1
@@ -371,16 +372,30 @@ async def handle_connection(reader, writer):
     nabu_session = NabuAdaptor(reader,writer)
     await nabu_session.run_NabuSession()
 
-async def main():
-
+async def start_tcp_server():
     server = await asyncio.start_server(
             handle_connection, '0.0.0.0', 5816)
     addrs = ', '.join(str(sock.getsockname()) for sock in server.sockets)
-    print(f'Serving on {addrs}')
+    print(f'Serving TCP on {addrs}')
+    return server
 
-    async with server:
-        await server.serve_forever()
+
+async def start_serial_session(ttyname):
+    print(f'Starting serial session on {ttyname}')
+    reader, writer = await serial_asyncio.open_serial_connection(url=ttyname, baudrate=args.baudrate, stopbits=serial.STOPBITS_TWO, timeout=0.5)
+    await handle_connection(reader, writer)
+
+async def main(args):
+
+
+    # serial_session = await start_serial_session(args.ttyname)
+    server = await start_tcp_server()
+
+   # async with server:
+    await asyncio.gather(
+        server.serve_forever(), start_serial_session(args.ttyname)
+    )
 
 print ("Started...")
-asyncio.run(main())
+asyncio.run(main(args))
 
