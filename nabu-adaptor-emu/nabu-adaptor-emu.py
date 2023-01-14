@@ -342,7 +342,7 @@ channelCode = '0000'
 
 parser = argparse.ArgumentParser()
 # Positional argument for ttyname - required
-parser.add_argument("ttyname",
+parser.add_argument("-t", "--ttyname",
         help="Set serial device (e.g. /dev/ttyUSB0)")
 # Optional argument for baudrate
 parser.add_argument("-b", "--baudrate",
@@ -351,22 +351,12 @@ parser.add_argument("-b", "--baudrate",
         default=DEFAULT_BAUDRATE)
 args = parser.parse_args()
 
-if args.ttyname is None:
-    parser.print_help()
-    exit(1)
-
-# Some hard-coded things here (timeout, stopbits)
-# ser = serial.Serial(port=args.ttyname, baudrate=args.baudrate, timeout=0.5, stopbits=serial.STOPBITS_TWO)
 segments = {}
 
 print("* Loading NABU Segments into memory")
 loadpak("000001")
 
-# Crude implementation - we could probably scan a directory for files here.
-# TODO: The PAK file is pre-split into individual packets, each with headers and checksums. 
 # TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
-# 
-
 
 async def handle_connection(reader, writer):
     nabu_session = NabuAdaptor(reader,writer)
@@ -387,13 +377,21 @@ async def start_serial_session(ttyname):
 
 async def main(args):
 
+    sessions = []
 
-    # serial_session = await start_serial_session(args.ttyname)
+    # Serial session if enabled
+    if args.ttyname is not None:
+        serial_session = await start_serial_session(args.ttyname)
+        sessions.append(serial_session)
+    else:
+        print("No serial connection configured.")
+
+    # setup TCP session
     server = await start_tcp_server()
+    sessions.append(server.serve_forever())
 
-   # async with server:
     await asyncio.gather(
-        server.serve_forever(), start_serial_session(args.ttyname)
+         *sessions
     )
 
 print ("Started...")
