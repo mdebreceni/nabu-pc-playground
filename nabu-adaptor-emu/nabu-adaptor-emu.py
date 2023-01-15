@@ -29,7 +29,7 @@ MAX_READ=65535
 # request type
 # Others (from http://dunfield.classiccmp.org/nabu/nabutech.pdf,
 # Segment Routines  Page 9 - 3
-# 
+#
 # $80   Reset Segment Handler (Resets Adaptor to known state)
 #       (also see Page 2 - 14)
 # $81   Reset (?)
@@ -51,6 +51,19 @@ class NabuAdaptor():
         print("Called NabuAdaptor::__init__")
         self.reader=reader
         self.writer=writer
+        self.segment = None
+        self.segments = {}
+
+    # Loads pak from file, assumes file names are all upper case with a lower case .pak extension
+    # Assumes all pak files are in a directory called paks/
+    # 000001.pak from cycle 2 needs to have the last 16 bytes of 1A's stripped off
+    # 000001.pak from cycle 1 is horribly corrupt and dosen't work
+    def loadpak(self, filename):
+        file = filename.upper()
+        print("* Loading NABU Segments into memory")
+        segment = NabuSegment()
+        segment.ingest_from_file( "paks/"+ file + ".pak")
+        self.segments[filename] = segment
 
     async def run_NabuSession(self):
         while True:
@@ -99,7 +112,7 @@ class NabuAdaptor():
                     print("got request type 10, sending time")
                     await self.send_time()
                     await self.sendBytes(bytes([0x10, 0xe1]))
-        
+
                 else:
                     print("* Req type {} is Unimplemented :(".format(data[0]))
                     await self.handle_unimplemented_req(data)
@@ -185,58 +198,52 @@ class NabuAdaptor():
         segmentId=str(segmentNumber.hex())
         print("* Requested Segment ID: " + segmentId)
         print("* Requested PacketNumber: " + str(packetNumber))
-        if segmentId != "7fffff" and segmentId != loadedpak:
-            loadpak(segmentId)
-            await self.sendBytes(bytes([0x91]))
+        if segmentId == "7fffff":
+            print("Time packet requested")
+            await self.sendBytes(bytes([0xe4, 0x91]))
+            segmentId == ""
+            response = await self.recvBytesExactLen(2)
+            print("* Response from NPC: " + response.hex(" "))
+            print("segmentId", segmentId)
+            print("packetnumber", packetNumber)
+            print("segments", self.segments)
+            await self.send_time()
+            await self.sendBytes(bytes([0x10, 0xe1]))
         else:
-            if segmentId == "7fffff":
-                print("Time packet requested")
-                await self.sendBytes(bytes([0xe4, 0x91]))
-                segmentId == ""
-                response = await self.recvBytesExactLen(2)
-                print("* Response from NPC: " + response.hex(" "))
-                print("segmentId", segmentId)
-                print("packetnumber", packetNumber)
-                print("segments", segments)
-                await self.send_time()
-                await self.sendBytes(bytes([0x10, 0xe1]))
+            await self.sendBytes(bytes([0xe4, 0x91]))
+            response = await self.recvBytesExactLen(2)
+            print("* Response from NPC: " + response.hex(" "))
+            print("segmentId", segmentId)
+            print("packetnumber", packetNumber)
+            print("segments", self.segments)
 
-            else:
-                await self.sendBytes(bytes([0xe4, 0x91]))
-                response = await self.recvBytesExactLen(2)
-                print("* Response from NPC: " + response.hex(" "))
-                print("segmentId", segmentId)
-                print("packetnumber", packetNumber)
-                print("segments", segments)
+    # Get Segment from internal segment store
+            if segmentId not in self.segments:
+                self.loadpak(segmentId)
+            segment = self.segments[segmentId]
 
-        # Get Segment from internal segment store
-                if segmentId in segments:
-                    segment = segments[segmentId]
-                else:
-                    return None
+        # Get requested pack from that segment
+            pack_data = segment.get_pack(packetNumber)
 
-            # Get requested pack from that segment
-                pack_data = segment.get_pack(packetNumber)
+    # Dump information about pack.  'pack' is otherwise unused
+            pack = NabuPack()
+            pack.ingest_bytes(pack_data)
+            print("* Pack to send: " + pack_data.hex(' '))
+            print("* pack_segment_id: "+ pack.pack_segment_id.hex())
+            print("* pack_packnum: " + pack.pack_packnum.hex())
+            print("* segment_owner: " + pack.segment_owner.hex())
+            print("* segment_tier: " + pack.segment_tier.hex())
+            print("* segment_mystery_bytes: " + pack.segment_mystery_bytes.hex())
+            print("* pack type: " + pack.pack_type.hex())
+            print("* pack_number: " + pack.pack_number.hex())
+            print("* pack_offset: " + pack.pack_offset.hex())
+            print("* pack_crc: " + pack.pack_crc.hex())
+            print("* pack length: {}".format(len(pack_data)))
 
-        # Dump information about pack.  'pack' is otherwise unused
-                pack = NabuPack()
-                pack.ingest_bytes(pack_data)
-                print("* Pack to send: " + pack_data.hex(' ')) 
-                print("* pack_segment_id: "+ pack.pack_segment_id.hex())
-                print("* pack_packnum: " + pack.pack_packnum.hex())
-                print("* segment_owner: " + pack.segment_owner.hex())
-                print("* segment_tier: " + pack.segment_tier.hex())
-                print("* segment_mystery_bytes: " + pack.segment_mystery_bytes.hex())
-                print("* pack type: " + pack.pack_type.hex())
-                print("* pack_number: " + pack.pack_number.hex())
-                print("* pack_offset: " + pack.pack_offset.hex())
-                print("* pack_crc: " + pack.pack_crc.hex())
-                print("* pack length: {}".format(len(pack_data)))
-
-        # escape pack data (0x10 bytes should be escaped maybe?)
-                escaped_pack_data = self.escapeUploadBytes(pack_data)
-                await self.sendBytes(escaped_pack_data)
-                await self.sendBytes(bytes([0x10, 0xe1]))
+    # escape pack data (0x10 bytes should be escaped maybe?)
+            escaped_pack_data = self.escapeUploadBytes(pack_data)
+            await self.sendBytes(escaped_pack_data)
+            await self.sendBytes(bytes([0x10, 0xe1]))
 
     async def handle_set_channel_code(self, data):
         global channelCode
@@ -317,25 +324,9 @@ class NabuAdaptor():
 
         if(len(data) > 0):
             print("NPC-->NA:   " + data.hex(' '))
-        
+
         return data
 
-# Loads pak from file, assumes file names are all upper case with a lower case .pak extension
-# Assumes all pak files are in a directory called paks/
-# 000001.pak from cycle 2 needs to have the last 16 bytes of 1A's stripped off
-# 000001.pak from cycle 1 is horribly corrupt and dosen't work
-
-def loadpak(filename):
-    file = filename.upper()
-    global segments 
-    segments = {}
-    print("* Loading NABU Segments into memory")
-    global segment1
-    segment1 = NabuSegment()
-    segment1.ingest_from_file( "paks/"+ file + ".pak")
-    segments[filename] = segment1
-    global loadedpak
-    loadedpak = filename
 
 ######  Begin main code here
 
@@ -354,10 +345,8 @@ parser.add_argument("-b", "--baudrate",
         default=DEFAULT_BAUDRATE)
 args = parser.parse_args()
 
-segments = {}
-
-print("* Loading NABU Segments into memory")
-loadpak("000001")
+#print("* Loading NABU Segments into memory")
+# loadpak("000001")
 
 # TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
 
