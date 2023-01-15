@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# 
+#
 # NABU Adaptor Emulator - Copyright Mike Debreceni - 2022
-# 
+#
 # Usage:   python3 ./nabu-adaptor-emu.py [--baudrate BAUDRATE] TTYNAME
 #
 # Example:
 #          python3 ./nabu-adaptor-emu.py --baudrate=111863 /dev/ttyUSB0
 #
-# 
+#
 # Ugly hack to make this work with directory of pak files from a cycle added by Sark
 # There is a better way to do this, I'm sure of it. But this works (mostly)
 # This works with a directory of pak files, in paks/
@@ -117,12 +117,12 @@ class NabuAdaptor():
                 else:
                     print("* Req type {} is Unimplemented :(".format(data[0]))
                     await self.handle_unimplemented_req(data)
-    
+
     async def send_ack(self):
         await self.sendBytes(bytes([0x10, 0x06]))
 
     # Pre-formed time packet, sends Jan 1 1984 at 00:00:00
-    # Todo - add proper time packet generation and CRC 
+    # Todo - add proper time packet generation and CRC
 
     def get_time_bytes(self):
         data = bytearray([0x7f, 0xff, 0xff, 0x00, 0x01, 0x7f, 0xff, 0xff, 0xff, 0x7f, 0x80, 0x20, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02])
@@ -148,9 +148,9 @@ class NabuAdaptor():
     # TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
     # TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
 
-    async def handle_0xf0_request(self, data):  
+    async def handle_0xf0_request(self, data):
         await self.send_ack()
-    
+
     async def handle_0x05_request(self, data):
         await self.send_ack()
 
