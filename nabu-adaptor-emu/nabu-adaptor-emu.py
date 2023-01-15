@@ -47,12 +47,13 @@ MAX_READ=65535
 # $99   Resolve Global Reference
 
 class NabuAdaptor():
+    segments = {}
+
     def __init__(self, reader, writer):
         print("Called NabuAdaptor::__init__")
         self.reader=reader
         self.writer=writer
         self.segment = None
-        self.segments = {}
 
     # Loads pak from file, assumes file names are all upper case with a lower case .pak extension
     # Assumes all pak files are in a directory called paks/
@@ -63,7 +64,7 @@ class NabuAdaptor():
         print("* Loading NABU Segments into memory")
         segment = NabuSegment()
         segment.ingest_from_file( "paks/"+ file + ".pak")
-        self.segments[filename] = segment
+        NabuAdaptor.segments[filename] = segment
 
     async def run_NabuSession(self):
         while True:
@@ -206,7 +207,7 @@ class NabuAdaptor():
             print("* Response from NPC: " + response.hex(" "))
             print("segmentId", segmentId)
             print("packetnumber", packetNumber)
-            print("segments", self.segments)
+            print("segments", NabuAdaptor.segments)
             await self.send_time()
             await self.sendBytes(bytes([0x10, 0xe1]))
         else:
@@ -215,12 +216,12 @@ class NabuAdaptor():
             print("* Response from NPC: " + response.hex(" "))
             print("segmentId", segmentId)
             print("packetnumber", packetNumber)
-            print("segments", self.segments)
+            print("segments", NabuAdaptor.segments)
 
     # Get Segment from internal segment store
-            if segmentId not in self.segments:
+            if segmentId not in NabuAdaptor.segments:
                 self.loadpak(segmentId)
-            segment = self.segments[segmentId]
+            segment = NabuAdaptor.segments[segmentId]
 
         # Get requested pack from that segment
             pack_data = segment.get_pack(packetNumber)
