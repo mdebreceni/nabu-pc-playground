@@ -54,7 +54,8 @@ class NabuAdaptor():
 
     async def run_NabuSession(self):
         while True:
-            data = await self.recvBytes()
+            # data = await self.recvBytes()
+            data = await self.recvBytesExactLen(1)
             if len(data) > 0:
                 req_type = data[0]
                 if req_type == 0x03:
@@ -255,7 +256,9 @@ class NabuAdaptor():
 
     async def handle_0x8f_req(self, data):
         print("* 0x8f request")
-        data = await self.recvBytes()
+        if len(data) < 2:
+            print("Waiting for throwaway data")
+            data = await self.recvBytesExactLen(1)
         await self.sendBytes(bytes([0xe4]))
 
     def handle_unimplemented_req(self, data):
@@ -370,8 +373,8 @@ async def start_tcp_server():
     return server
 
 
-async def start_serial_session(ttyname):
-    print(f'Starting serial session on {ttyname}')
+async def start_serial_session(ttyname, baudrate):
+    print(f'Starting serial session on {ttyname} at {baudrate} bps')
     reader, writer = await serial_asyncio.open_serial_connection(url=ttyname, baudrate=args.baudrate, stopbits=serial.STOPBITS_TWO, timeout=0.5)
     await handle_connection(reader, writer)
 
@@ -379,16 +382,16 @@ async def main(args):
 
     sessions = []
 
-    # Serial session if enabled
-    if args.ttyname is not None:
-        serial_session = await start_serial_session(args.ttyname)
-        sessions.append(serial_session)
-    else:
-        print("No serial connection configured.")
-
     # setup TCP session
     server = await start_tcp_server()
     sessions.append(server.serve_forever())
+
+    # Serial session if enabled
+    if args.ttyname is not None:
+        serial_session = await start_serial_session(args.ttyname, args.baudrate)
+        sessions.append(serial_session)
+    else:
+        print("No serial connection configured.")
 
     await asyncio.gather(
          *sessions
