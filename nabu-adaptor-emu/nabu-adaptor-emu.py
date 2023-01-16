@@ -67,56 +67,66 @@ class NabuAdaptor():
         NabuAdaptor.segments[filename] = segment
 
     async def run_NabuSession(self):
-        while True:
-            # data = await self.recvBytes()
-            data = await self.recvBytesExactLen(1)
-            if len(data) > 0:
-                req_type = data[0]
-                if req_type == 0x03:
-                    print("* 0x03 request")
-                    await self.handle_0x03_request(data)
-                elif req_type == 0x05:
-                    print("* 0x05 request")
-                    await self.handle_0x05_request(data)
-                elif req_type == 0x06:
-                    print("* 0x06 request")
-                    await self.handle_0x06_request(data)
-                elif req_type == 0x0f:
-                    print("* 0x0f request")
-                    await self.handle_0x0f_request(data)
-                elif req_type == 0xf0:
-                    print("* 0xf0 request")
-                    self.andle_0xf0_request(data)
-                elif req_type == 0x80:
-                    print("* Reset segment handler")
-                    await self.handle_reset_segment_handler(data)
-                elif req_type == 0x81:
-                    print("* Reset")
-                    await self.handle_reset(data)
-                elif req_type == 0x82:
-                    print("* Get Status")
-                    await self.handle_get_status(data)
-                elif req_type == 0x83:
-                    print("* Set Status")
-                    await self.handle_set_status(data)
-                elif req_type == 0x84:
-                    print("* Download Segment Request")
-                    await self.handle_download_segment(data)
-                elif req_type == 0x85:
-                    print("* Set Channel Code")
-                    await self.handle_set_channel_code(data)
-                    print("* Channel code is now " + channelCode)
-                elif req_type == 0x8f:
-                    print("* Handle 0x8f")
-                    await self.handle_0x8f_req(data)
-                elif req_type == 0x10:
-                    print("got request type 10, sending time")
-                    await self.send_time()
-                    await self.sendBytes(bytes([0x10, 0xe1]))
+        connected = True
+        while connected:
+            try:
+                data = await self.recvBytesExactLen(1)
+                if len(data) > 0:
+                    req_type = data[0]
+                    if req_type == 0x03:
+                        print("* 0x03 request")
+                        await self.handle_0x03_request(data)
+                    elif req_type == 0x05:
+                        print("* 0x05 request")
+                        await self.handle_0x05_request(data)
+                    elif req_type == 0x06:
+                        print("* 0x06 request")
+                        await self.handle_0x06_request(data)
+                    elif req_type == 0x0f:
+                        print("* 0x0f request")
+                        await self.handle_0x0f_request(data)
+                    elif req_type == 0xf0:
+                        print("* 0xf0 request")
+                        self.andle_0xf0_request(data)
+                    elif req_type == 0x80:
+                        print("* Reset segment handler")
+                        await self.handle_reset_segment_handler(data)
+                    elif req_type == 0x81:
+                        print("* Reset")
+                        await self.handle_reset(data)
+                    elif req_type == 0x82:
+                        print("* Get Status")
+                        await self.handle_get_status(data)
+                    elif req_type == 0x83:
+                        print("* Set Status")
+                        await self.handle_set_status(data)
+                    elif req_type == 0x84:
+                        print("* Download Segment Request")
+                        await self.handle_download_segment(data)
+                    elif req_type == 0x85:
+                        print("* Set Channel Code")
+                        await self.handle_set_channel_code(data)
+                        print("* Channel code is now " + channelCode)
+                    elif req_type == 0x8f:
+                        print("* Handle 0x8f")
+                        await self.handle_0x8f_req(data)
+                    elif req_type == 0x10:
+                        print("got request type 10, sending time")
+                        await self.send_time()
+                        await self.sendBytes(bytes([0x10, 0xe1]))
+    
+                    else:
+                        print("* Req type {} is Unimplemented :(".format(data[0]))
+                        await self.handle_unimplemented_req(data)
+            except asyncio.exceptions.IncompleteReadError:
+                connected = False
+                print("Incomplete read error.")
+            except ConnectionResetError:
+                connected = False
+                print("Connection reset by peer.")
 
-                else:
-                    print("* Req type {} is Unimplemented :(".format(data[0]))
-                    await self.handle_unimplemented_req(data)
+        print("Closing session.")
+
 
     async def send_ack(self):
         await self.sendBytes(bytes([0x10, 0x06]))
@@ -143,7 +153,6 @@ class NabuAdaptor():
         time_bytes = self.get_time_bytes()
         escaped_time_bytes = self.escapeUploadBytes(time_bytes)
         await self.sendBytes(escaped_time_bytes)
-
 
     # TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
     # TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
@@ -193,9 +202,9 @@ class NabuAdaptor():
         # [11]        NPC       $84
         #              NA        $10 06
         await self.send_ack()
-        data=await self.recvBytesExactLen(1)
+        data=await self.recvBytesExactLen(4)
         packetNumber=data[0]
-        segmentNumber=bytes(reversed(await self.recvBytesExactLen(3)))
+        segmentNumber=bytes(reversed(data[1:4]))
         segmentId=str(segmentNumber.hex())
         print("* Requested Segment ID: " + segmentId)
         print("* Requested PacketNumber: " + str(packetNumber))
@@ -307,14 +316,8 @@ class NabuAdaptor():
     async def recvBytesExactLen(self, length=None):
         if(length is None):
             return None
-        data = await self.recvBytes(length)
-
-        while len(data) < length:
-            remaining = length - len(data)
-            print("Waiting for {} more bytes".format(length - len(data)))
-            print(data.hex(' '))
-        #     time.sleep(0.01)
-            data = data + await self.recvBytes(remaining)
+        data = await self.reader.readexactly(length)
+        print("NPC-->NA:   " + data.hex(' '))
         return data
 
 
@@ -325,7 +328,8 @@ class NabuAdaptor():
 
         if(len(data) > 0):
             print("NPC-->NA:   " + data.hex(' '))
-
+        else:
+            print("NBC->NA: Zero data.  Disconnected??")
         return data
 
 
