@@ -67,9 +67,18 @@ class NabuAdaptor():
         NabuAdaptor.segments[filename] = segment
 
     async def run_NabuSession(self):
-        while True:
-            # data = await self.recvBytes()
-            data = await self.recvBytesExactLen(1)
+        connected = True
+        while connected:
+            try:
+                data = await self.recvBytesExactLen(1)
+            except asyncio.exceptions.IncompleteReadError:
+                connected = False
+                print("Incomplete read. Connection is lost. Closing session.")
+                return
+            except ConnectionResetError:
+                connected = False
+                print("Connection reset by peer.  Closing session.")
+
             if len(data) > 0:
                 req_type = data[0]
                 if req_type == 0x03:
@@ -144,7 +153,6 @@ class NabuAdaptor():
         escaped_time_bytes = self.escapeUploadBytes(time_bytes)
         await self.sendBytes(escaped_time_bytes)
 
-
     # TODO:  We can probably get rid of handle_0xf0_request, handle_0x0f_request and handle_0x03_request
     # TODO:  as these bytes may have been from RS-422 buffer overruns / other errors
 
@@ -193,9 +201,9 @@ class NabuAdaptor():
         # [11]        NPC       $84
         #              NA        $10 06
         await self.send_ack()
-        data=await self.recvBytesExactLen(1)
+        data=await self.recvBytesExactLen(4)
         packetNumber=data[0]
-        segmentNumber=bytes(reversed(await self.recvBytesExactLen(3)))
+        segmentNumber=bytes(reversed(data[1:4]))
         segmentId=str(segmentNumber.hex())
         print("* Requested Segment ID: " + segmentId)
         print("* Requested PacketNumber: " + str(packetNumber))
@@ -307,14 +315,8 @@ class NabuAdaptor():
     async def recvBytesExactLen(self, length=None):
         if(length is None):
             return None
-        data = await self.recvBytes(length)
-
-        while len(data) < length:
-            remaining = length - len(data)
-            print("Waiting for {} more bytes".format(length - len(data)))
-            print(data.hex(' '))
-        #     time.sleep(0.01)
-            data = data + await self.recvBytes(remaining)
+        data = await self.reader.readexactly(length)
+        print("NPC-->NA:   " + data.hex(' '))
         return data
 
 
@@ -325,7 +327,8 @@ class NabuAdaptor():
 
         if(len(data) > 0):
             print("NPC-->NA:   " + data.hex(' '))
-
+        else:
+            print("NBC->NA: Zero data.  Disconnected??")
         return data
 
 
