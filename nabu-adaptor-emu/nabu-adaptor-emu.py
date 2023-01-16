@@ -2,11 +2,18 @@
 #
 # NABU Adaptor Emulator - Copyright Mike Debreceni - 2022
 #
-# Usage:   python3 ./nabu-adaptor-emu.py [--baudrate BAUDRATE] TTYNAME
+# Usage:   python3 ./nabu-adaptor-emu.py  [--ttyname TTYNAME] [--baudrate BAUDRATE]
+#
+# * If ttyname is passed, listen on serial port as well as TCP
+# * if ttyname is not passed, listen only on TCP (port 5816)
+# * if baud rate is not specified, DEFAULT_BAUD_RATE is 111863
 #
 # Example:
-#          python3 ./nabu-adaptor-emu.py --baudrate=111863 /dev/ttyUSB0
+#          TCP and serial via /dev/ttyUSB0
+#          python3 ./nabu-adaptor-emu.py --ttyname /dev/ttyUSB0 -baudrate=111863 
 #
+#          TCP only
+#          python3 ./nabu-adaptor-emu.py
 #
 # Ugly hack to make this work with directory of pak files from a cycle added by Sark
 # There is a better way to do this, I'm sure of it. But this works (mostly)
@@ -349,9 +356,6 @@ parser.add_argument("-b", "--baudrate",
         help="Set serial baud rate (default: {} BPS)".format(DEFAULT_BAUDRATE),
         default=DEFAULT_BAUDRATE)
 args = parser.parse_args()
-
-#print("* Loading NABU Segments into memory")
-# loadpak("000001")
 
 # TODO: We should change this to handle .nabu files instead, which have not yet been split into packets with headers and checksums
 
