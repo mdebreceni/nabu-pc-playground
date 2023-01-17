@@ -23,13 +23,13 @@ void main() {
   main2();
 }
 
+#define FONT_STANDARD
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <z80.h>
-#include "tms9918.h"
-#include "nabu.h"
+#include "../../NABULIB/NABU-LIB.h"
 
 #define MAX_ITERATION 50
 #define X_RES 64.0
@@ -115,7 +115,7 @@ bool handle_input(void) {
 	if(cursor_ypos > 160) cursor_ydir = -1;
 	cursor_ypos += cursor_ydir;
 
-	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
+	vdp_setSpritePosition(sprite_handle, cursor_xpos, cursor_ypos);
 
 	return true;
 
@@ -142,22 +142,22 @@ float pixel_y_to_ci(int y, float ci_min, float ci_max) {
 
 void main2() {
 
-	vdp_init(VDP_MODE_MULTICOLOR, VDP_DARK_BLUE, SPRITE_LARGE, false);
+	vdp_init(VDP_MODE_MULTICOLOR, VDP_DARK_BLUE, SPRITE_LARGE, false, false);
 	for(int i=0; i<256; i++) {
-		vdp_set_sprite_pattern(i, cursor_sprite_large);
+		vdp_setSpritePattern(i, cursor_sprite_large);
 	}
 
-	sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
-	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
+	sprite_handle = vdp_spriteInit(0, 0, VDP_WHITE);
+	vdp_setSpritePosition(sprite_handle, cursor_xpos, cursor_ypos);
 
 	for (int y=0; y<48; y++) {
 		float ci = pixel_y_to_ci(y, ci_min, ci_max);
 		for (int x=0; x<64; x++) {
-			vdp_plot_color(x, y, VDP_WHITE);
+			vdp_plotColor(x, y, VDP_WHITE);
 			float cr = pixel_x_to_cr(x, cr_min, cr_max);
 			int i = iterationCount(cr, ci, &handle_input);
 			int color = iterToColor(i);
-			vdp_plot_color(x, y, color);
+			vdp_plotColor(x, y, color);
 		}
 	}
 	while(true) {
