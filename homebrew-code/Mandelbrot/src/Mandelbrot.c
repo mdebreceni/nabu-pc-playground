@@ -106,14 +106,41 @@ int iterationCount(float cr, float ci, bool (*callback_func)(void)) {
 }
 
 bool handle_input(void) {
+    static uint8_t lastStatus;
+	uint8_t status = IO_KEYBOARD_STATUS;
+	uint8_t key = IO_KEYBOARD;
 
-	if (cursor_xpos < 32) cursor_xdir = 1;
-	if (cursor_xpos > 272) cursor_xdir = -1;
-	cursor_xpos += cursor_xdir;
+    if(status != lastStatus) {
+		switch(key) {
+			case 'w':
+			    cursor_ypos--;
+				break;
+			case 'a':
+				cursor_xpos--;
+				break;
+			case 's':
+				cursor_ypos++;
+				break;
+			case 'd':
+				cursor_xpos++;
+				break;
+		}
+
+		lastStatus = status;
+	}	
+//	if (cursor_xpos < 32) cursor_xdir = 1;
+//	if (cursor_xpos > 272) cursor_xdir = -1;
+//	cursor_xpos += cursor_xdir;
 	
-	if(cursor_ypos <= 0) cursor_ydir = 1;
-	if(cursor_ypos > 160) cursor_ydir = -1;
-	cursor_ypos += cursor_ydir;
+//	if(cursor_ypos <= 0) cursor_ydir = 1;
+//	if(cursor_ypos > 160) cursor_ydir = -1;
+//	cursor_ypos += cursor_ydir;
+
+	if(cursor_xpos < 32) cursor_xpos = 32;
+	if(cursor_xpos >= 272) cursor_xpos = 272;
+
+	if(cursor_ypos <= 0) cursor_ypos = 0;
+	if(cursor_ypos > 160) cursor_ypos = 160;
 
 	vdp_setSpritePosition(sprite_handle, cursor_xpos, cursor_ypos);
 
