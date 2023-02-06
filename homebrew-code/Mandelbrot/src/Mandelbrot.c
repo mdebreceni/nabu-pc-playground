@@ -122,7 +122,7 @@ bool handle_input(void) {
 		key = LastKeyPressed;
 	}
 
-	if (stepSize < 1 || stepSize > 9) stepSize = 1;
+    if (stepSize < 1 || stepSize > 9) stepSize = 4;
 
 	switch(key) {
 		case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
