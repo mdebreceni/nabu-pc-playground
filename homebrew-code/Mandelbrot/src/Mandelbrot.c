@@ -49,37 +49,37 @@ uint8_t cursor_sprite_small[] = {
 	0x81,
 	0x81,
 	0x81,
-	0x81,
-	0x81,
-	0xff
+	0xff,
+	0x00,
+	0x00
 };
 
 
 uint8_t cursor_sprite_large[32] = {
 	0xff, 0xff,
-       	0x80, 0x80, 
+    0x80, 0x80, 
 	0x80, 0x80,
-       	0x80, 0x80, 
+    0x80, 0x80, 
 
 	0x80, 0x80,
-       	0x80, 0x80, 
-	0x80, 0x80,
-       	0xff, 0xff, 
-	
+    0xff, 0xff, 
+	0x00, 0x00,
+	0x00, 0x00,
+
 	0xff, 0xff,
-       	0x01, 0x01, 
+    0x01, 0x01, 
 	0x01, 0x01,
-       	0x01, 0x01, 
+    0x01, 0x01, 
+	0x01, 0x01,
+    0xff, 0xff, 
+	0x00, 0x00,
+	0x00, 0x00,
 
-	0x01, 0x01,
-       	0x01, 0x01, 
-	0x01, 0x01,
-       	0xff, 0xff, 
 };
 
 int16_t sprite_handle = 0;
 int16_t cursor_xpos = 160 - 8;
-int16_t cursor_ypos = 96 - 8;
+int16_t cursor_ypos = 96 - 6;
 int16_t cursor_xdir = 1;
 int16_t cursor_ydir = 1;
 
@@ -151,7 +151,7 @@ bool handle_input(void) {
 	if(cursor_xpos >= 272) cursor_xpos = 272;
 
 	if(cursor_ypos <= 0) cursor_ypos = 0;
-	if(cursor_ypos > 176) cursor_ypos = 176;
+	if(cursor_ypos > 180) cursor_ypos = 180;
 
 	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
 
@@ -226,7 +226,7 @@ void main2() {
 	new_cr_min = sprite_x_to_cr(cursor_xpos - 32, cr_min, cr_max);
     new_cr_max = sprite_x_to_cr(cursor_xpos - 32 + 16, cr_min, cr_max);
 	new_ci_min = sprite_y_to_ci(cursor_ypos, ci_min, ci_max);
-	new_ci_max = sprite_y_to_ci(cursor_ypos + 16, ci_min, ci_max);
+	new_ci_max = sprite_y_to_ci(cursor_ypos + 12, ci_min, ci_max);
 
 	cr_min = new_cr_min;
 	cr_max = new_cr_max;
