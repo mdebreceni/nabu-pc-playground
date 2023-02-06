@@ -136,7 +136,7 @@ bool handle_input(void) {
 		case 'd':
 			cursor_xpos+=stepSize;
 			break;
-		case 0x0a: case 0x0d:
+		case 0x0d:  // ENTER or GO
 			return false;
 		case 148:
 			LastKeyPressed = 148;
