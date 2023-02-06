@@ -33,8 +33,12 @@ void main() {
 #include "tms9918.h"
 
 #define MAX_ITERATION 50
-#define X_RES 64.0
-#define Y_RES 48.0
+
+#define X_RES_PIXELS 64.0
+#define Y_RES_PIXELS 48.0
+
+#define SPRITE_X_MAXPOS 256.0
+#define SPRITE_Y_MAXPOS 192.0
 
 #define SPRITE_LARGE true
 #define SPRITE_SMALL false
@@ -147,7 +151,7 @@ bool handle_input(void) {
 	if(cursor_xpos >= 272) cursor_xpos = 272;
 
 	if(cursor_ypos <= 0) cursor_ypos = 0;
-	if(cursor_ypos > 160) cursor_ypos = 160;
+	if(cursor_ypos > 176) cursor_ypos = 176;
 
 	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
 
@@ -164,17 +168,32 @@ int iterToColor(int i) {
 }
 
 float pixel_x_to_cr(int x, float cr_min, float cr_max) {
-	float cr = x / X_RES * (cr_max - cr_min) + cr_min;
+	float cr = x / X_RES_PIXELS * (cr_max - cr_min) + cr_min;
 	return cr;
 }
 
 float pixel_y_to_ci(int y, float ci_min, float ci_max) {
-	float ci = y / Y_RES * (ci_max - ci_min) + ci_min;
+	float ci = y / Y_RES_PIXELS * (ci_max - ci_min) + ci_min;
 	return ci;
 }
 
+float sprite_x_to_cr(int x, float cr_min, float cr_max) {
+	float cr = x / SPRITE_X_MAXPOS * (cr_max - cr_min) + cr_min;
+	return cr;
+}
+
+float sprite_y_to_ci(int y, float ci_min, float ci_max) {
+	float ci = y / SPRITE_Y_MAXPOS * (ci_max - ci_min) + ci_min;
+	return ci;
+}
 
 void main2() {
+	float new_cr_min = cr_min;
+	float new_cr_max = cr_max;
+	float new_ci_min = ci_min;
+	float new_ci_max = ci_max;
+
+	while(true) {
 	vdp_init(VDP_MODE_MULTICOLOR, VDP_DARK_BLUE, SPRITE_LARGE, false);
 	for(int i=0; i<256; i++) {
 		vdp_set_sprite_pattern(i, cursor_sprite_large);
@@ -202,5 +221,16 @@ void main2() {
 	while(keepgoing) {
 		keepgoing = handle_input();
 		z80_delay_ms(100);
+	}
+
+	new_cr_min = sprite_x_to_cr(cursor_xpos - 32, cr_min, cr_max);
+    new_cr_max = sprite_x_to_cr(cursor_xpos - 32 + 16, cr_min, cr_max);
+	new_ci_min = sprite_y_to_ci(cursor_ypos, ci_min, ci_max);
+	new_ci_max = sprite_y_to_ci(cursor_ypos + 16, ci_min, ci_max);
+
+	cr_min = new_cr_min;
+	cr_max = new_cr_max;
+	ci_min = new_ci_min;
+	ci_max = new_ci_max;
 	}
 }
