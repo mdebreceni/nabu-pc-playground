@@ -29,7 +29,8 @@ void main() {
 #include <stdlib.h>
 #include <string.h>
 #include <z80.h>
-#include "../../NABULIB/NABU-LIB.h"
+#include "nabu.h"
+#include "tms9918.h"
 
 #define MAX_ITERATION 50
 #define X_RES 64.0
@@ -87,6 +88,8 @@ float ci_min = -2;
 float ci_max = 2;
 
 int iterationCount(float cr, float ci, bool (*callback_func)(void)) {
+	// return number of iterations for testing if cr,ci is in Mandelbrot set
+	// return -1 if callback_func returns false (indicating we should interrupt calculation)
 	int i = 0;
 	float zr=0, zi=0;
 	float temp;
@@ -102,39 +105,43 @@ int iterationCount(float cr, float ci, bool (*callback_func)(void)) {
 		i++;
 	}
 
-	return i;
+	if(keepgoing == true) return i;
+	else return -1;
 }
 
 bool handle_input(void) {
-    static uint8_t lastStatus;
-	uint8_t status = IO_KEYBOARD_STATUS;
-	uint8_t key = IO_KEYBOARD;
+	static uint8_t lastStatus;
+	static uint8_t stepSize;
+	char key=0;
+	char keypressed = isKeyPressed();
+	if(keypressed) {
+		key = LastKeyPressed;
+	}
 
-    if(status != lastStatus) {
-		switch(key) {
-			case 'w':
-			    cursor_ypos--;
-				break;
-			case 'a':
-				cursor_xpos--;
-				break;
-			case 's':
-				cursor_ypos++;
-				break;
-			case 'd':
-				cursor_xpos++;
-				break;
-		}
+	if (stepSize < 1 || stepSize > 9) stepSize = 1;
 
-		lastStatus = status;
-	}	
-//	if (cursor_xpos < 32) cursor_xdir = 1;
-//	if (cursor_xpos > 272) cursor_xdir = -1;
-//	cursor_xpos += cursor_xdir;
-	
-//	if(cursor_ypos <= 0) cursor_ydir = 1;
-//	if(cursor_ypos > 160) cursor_ydir = -1;
-//	cursor_ypos += cursor_ydir;
+	switch(key) {
+		case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+                        stepSize = key - '0';
+			break;
+		case 'w':
+			cursor_ypos-=stepSize;
+			break;
+		case 'a':
+			cursor_xpos-=stepSize;
+			break;
+		case 's':
+			cursor_ypos+=stepSize;
+			break;
+		case 'd':
+			cursor_xpos+=stepSize;
+			break;
+		case 0x0a: case 0x0d:
+			return false;
+		case 148:
+			LastKeyPressed = 148;
+			break;
+	}
 
 	if(cursor_xpos < 32) cursor_xpos = 32;
 	if(cursor_xpos >= 272) cursor_xpos = 272;
@@ -142,7 +149,7 @@ bool handle_input(void) {
 	if(cursor_ypos <= 0) cursor_ypos = 0;
 	if(cursor_ypos > 160) cursor_ypos = 160;
 
-	vdp_setSpritePosition(sprite_handle, cursor_xpos, cursor_ypos);
+	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
 
 	return true;
 
@@ -168,26 +175,32 @@ float pixel_y_to_ci(int y, float ci_min, float ci_max) {
 
 
 void main2() {
-
-	vdp_init(VDP_MODE_MULTICOLOR, VDP_DARK_BLUE, SPRITE_LARGE, false, false);
+	vdp_init(VDP_MODE_MULTICOLOR, VDP_DARK_BLUE, SPRITE_LARGE, false);
 	for(int i=0; i<256; i++) {
-		vdp_setSpritePattern(i, cursor_sprite_large);
+		vdp_set_sprite_pattern(i, cursor_sprite_large);
 	}
 
-	sprite_handle = vdp_spriteInit(0, 0, VDP_WHITE);
-	vdp_setSpritePosition(sprite_handle, cursor_xpos, cursor_ypos);
+	sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
+	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
 
-	for (int y=0; y<48; y++) {
+	bool keepgoing = true;
+
+	for (int y=0; keepgoing && y<48; y++) {
 		float ci = pixel_y_to_ci(y, ci_min, ci_max);
-		for (int x=0; x<64; x++) {
-			vdp_plotColor(x, y, VDP_WHITE);
+		for (int x=0; keepgoing && x<64; x++) {
+			vdp_plot_color(x, y, VDP_WHITE);
 			float cr = pixel_x_to_cr(x, cr_min, cr_max);
 			int i = iterationCount(cr, ci, &handle_input);
-			int color = iterToColor(i);
-			vdp_plotColor(x, y, color);
+			if( i != -1) {
+			        int color = iterToColor(i);
+			        vdp_plot_color(x, y, color);
+			} else {
+				keepgoing = false;
+			}
 		}
 	}
-	while(true) {
-		z80_delay_ms(1000);
+	while(keepgoing) {
+		keepgoing = handle_input();
+		z80_delay_ms(100);
 	}
 }
