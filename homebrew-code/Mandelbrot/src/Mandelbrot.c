@@ -91,6 +91,15 @@ float cr_max = 2;
 float ci_min = -2;
 float ci_max = 2;
 
+void centerCursor(void) {
+    cursor_xpos = 160 - 8;
+    cursor_ypos = 96 - 6;
+    cursor_xdir = 1;
+    cursor_ydir = 1;	
+	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
+
+}
+
 int iterationCount(float cr, float ci, bool (*callback_func)(void)) {
 	// return number of iterations for testing if cr,ci is in Mandelbrot set
 	// return -1 if callback_func returns false (indicating we should interrupt calculation)
@@ -118,6 +127,8 @@ bool handle_input(void) {
 	static uint8_t stepSize;
 	char key=0;
 	char keypressed = isKeyPressed();
+	bool shouldKeepGoing = true;
+
 	if(keypressed) {
 		key = LastKeyPressed;
 	}
@@ -141,21 +152,24 @@ bool handle_input(void) {
 			cursor_xpos+=stepSize;
 			break;
 		case 0x0d:  // ENTER or GO
-			return false;
+			shouldKeepGoing = false;
+			break;
 		case 148:
 			LastKeyPressed = 148;
 			break;
 	}
+    if(shouldKeepGoing) {
+	    if(cursor_xpos < 32) cursor_xpos = 32;
+	    if(cursor_xpos >= 272) cursor_xpos = 272;
 
-	if(cursor_xpos < 32) cursor_xpos = 32;
-	if(cursor_xpos >= 272) cursor_xpos = 272;
-
-	if(cursor_ypos <= 0) cursor_ypos = 0;
-	if(cursor_ypos > 180) cursor_ypos = 180;
-
-	vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
-
-	return true;
+	    if(cursor_ypos <= 0) cursor_ypos = 0;
+	    if(cursor_ypos > 180) cursor_ypos = 180;
+	    vdp_sprite_set_position(sprite_handle, cursor_xpos, cursor_ypos);
+	} else {
+		stepSize = 4;
+	}
+	
+	return shouldKeepGoing;
 
 }
 
@@ -232,5 +246,6 @@ void main2() {
 	cr_max = new_cr_max;
 	ci_min = new_ci_min;
 	ci_max = new_ci_max;
+	centerCursor();
 	}
 }
