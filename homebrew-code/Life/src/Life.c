@@ -50,6 +50,8 @@ int16_t cursor_y = 24;
 
 char lifeGrid[64][48];
 char neighborCount[64][48];
+char cols_to_scan[64];
+char rows_to_scan[48];
 
 int16_t cursor_x_to_screen(int cursor_x) {
     int16_t offset = 0;
@@ -92,6 +94,53 @@ int countNeighbors(int x, int y) {
     return neighbors;
 }
 
+void setRowsToScan(void) {
+    for(int x=0; x<63; x++) {
+        if(cols_to_scan[x+1]) cols_to_scan[x] = 1;
+    }
+    for(int x=63; x>0; x--) {
+        if(cols_to_scan[x-1]) cols_to_scan[x] = 1;
+    }
+}
+
+void plotColsToScan(void) {
+    for(int x=0; x<64; x++) {
+        if(cols_to_scan[x]) vdp_plot_color(x, 0, VDP_LIGHT_GREEN); else vdp_plot_color(x, 0, VDP_DARK_BLUE);
+    }
+}
+
+
+void plotRowsToScan(void) {
+    for(int y=0; y<48; y++) {
+        if(rows_to_scan[y]) vdp_plot_color(0, y, VDP_LIGHT_GREEN); else vdp_plot_color(0, y, VDP_DARK_BLUE);
+    }
+}
+
+void setColsToScan(void) {
+    for (int y = 0; y<47; y++) {
+        if(rows_to_scan[y+1]) rows_to_scan[y] = 1;
+    }
+
+    for (int y = 47; y>0; y--) {
+        if(rows_to_scan[y-1]) rows_to_scan[y] = 1;
+    }
+}
+
+void initActiveRowsColsFromLifeGrid(void) {
+    memset(cols_to_scan, 0, 64);
+    memset(rows_to_scan, 0, 48);
+
+    for (int x=0; x<64; x++) {
+        for(int y=0; y<64; y++) {
+            if(lifeGrid[x][y]) {
+                cols_to_scan[x] = true;
+                rows_to_scan[y] = true;
+            }
+        }
+    }    
+    setRowsToScan();
+    setColsToScan();
+}
 
 void initGrid(void) {
     memset(lifeGrid, 0, sizeof(lifeGrid));
@@ -120,7 +169,8 @@ void initGrid(void) {
     lifeGrid[53][42] = true;
     lifeGrid[52][43] = true;
     lifeGrid[53][43] = true;
-    
+
+    initActiveRowsColsFromLifeGrid();    
 }
 
 void plotGrid(void) {
@@ -143,29 +193,46 @@ int runGeneration(bool (*callback_func)(void)) {
             neighborCount[x][y] = countNeighbors(x,y);
         }
     }
-    
+    char col_was_active[64];
+    char row_was_active[48];
+    memset(col_was_active, 0, 64);
+    memset(row_was_active, 0, 48);
+
     // calculate next generation
     for (int x = 0; x < 64; x++) {
-        for(int y = 0; y < 48; y++) {
-            int c = neighborCount[x][y];
-            if(lifeGrid[x][y] == true) {
-                // cell is currently alive
-                // * If a cell is alive, it stays alive if it has 2 or 3 neighbors
-                if( c < 2 || c > 3) {
-                    lifeGrid[x][y] = false;
-                    vdp_plot_color(x, y, VDP_DARK_BLUE);
-                }
-            } else {
-                // cell is dead.
-                // * If a cell is dead, it springs to life if it has 3 neighbors
-                if (c == 3) {
-                    lifeGrid[x][y] = true;
-                    vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
+        if (cols_to_scan[x]) {
+            for (int y = 0; y < 48; y++) {
+                if (rows_to_scan[y]) {
+                    int c = neighborCount[x][y];
+                    if (lifeGrid[x][y] == true) {
+                        // cell is currently alive
+                        // * If a cell is alive, it stays alive if it has 2 or 3
+                        // neighbors
+                        if (c < 2 || c > 3) {
+                            lifeGrid[x][y] = false;
+                            vdp_plot_color(x, y, VDP_DARK_BLUE);
+                            col_was_active[x] = true;
+                            row_was_active[y] = true;
+                        }
+                    } else {
+                        // cell is dead.
+                        // * If a cell is dead, it springs to life if it has 3
+                        // neighbors
+                        if (c == 3) {
+                            lifeGrid[x][y] = true;
+                            vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
+                            col_was_active[x] = true;
+                            row_was_active[y] = true;
+                        }
+                    }
                 }
             }
         }
     }
 
+    memcpy(cols_to_scan, col_was_active, 64);
+    memcpy(rows_to_scan, row_was_active, 48);
+    
     return 1;
 }
 
@@ -249,5 +316,9 @@ void main2() {
     plotGrid();
     while (true) {
         runGeneration(NULL);
+        setRowsToScan();
+        setColsToScan();
+        plotColsToScan();
+        plotRowsToScan();
     }
 }
