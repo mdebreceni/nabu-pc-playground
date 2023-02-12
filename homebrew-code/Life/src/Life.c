@@ -231,35 +231,33 @@ int runGeneration(bool (*callback_func)(void)) {
 
     // calculate next generation
     int x, y;
-    for (int idx=0; idx < 64 && cols_to_scan[idx] != (char) -1; idx++) {
+    for (int idx = 0; idx < 64 && cols_to_scan[idx] != (char)-1; idx++) {
         x = cols_to_scan[idx];
-            for (int idy = 0; idy < 48 && rows_to_scan[idy] != (char) -1; idy++) {
-                y = rows_to_scan[idy];
-                    int c = neighborCount[x][y];
-                    if (lifeGrid[x][y] == true) {
-                        // cell is currently alive
-                        // * If a cell is alive, it stays alive if it has 2 or 3
-                        // neighbors
-                        if (c < 2 || c > 3) {
-                            lifeGrid[x][y] = false;
-                            vdp_plot_color(x, y, VDP_DARK_BLUE);
-                            col_was_active[x] = true;
-                            row_was_active[y] = true;
-                        }
-                    } else {
-                        // cell is dead.
-                        // * If a cell is dead, it springs to life if it has 3
-                        // neighbors
-                        if (c == 3) {
-                            lifeGrid[x][y] = true;
-                            vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
-                            col_was_active[x] = true;
-                            row_was_active[y] = true;
-                        }
-                    }
-                //}
+        for (int idy = 0; idy < 48 && rows_to_scan[idy] != (char)-1; idy++) {
+            y = rows_to_scan[idy];
+            int c = neighborCount[x][y];
+            if (lifeGrid[x][y] == true) {
+                // cell is currently alive
+                // * If a cell is alive, it stays alive if it has 2 or 3
+                // neighbors
+                if (c < 2 || c > 3) {
+                    lifeGrid[x][y] = false;
+                    vdp_plot_color(x, y, VDP_DARK_BLUE);
+                    col_was_active[x] = true;
+                    row_was_active[y] = true;
+                }
+            } else {
+                // cell is dead.
+                // * If a cell is dead, it springs to life if it has 3
+                // neighbors
+                if (c == 3) {
+                    lifeGrid[x][y] = true;
+                    vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
+                    col_was_active[x] = true;
+                    row_was_active[y] = true;
+                }
             }
-        //}
+        }
     }
 
     memcpy(cols_to_scan, col_was_active, 64);
@@ -341,7 +339,6 @@ void main2() {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
     }
     sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
-//    vdp_sprite_set_position(sprite_handle, cursor_x, cursor_y);
 
     bool keepgoing = true;
     initGrid();
