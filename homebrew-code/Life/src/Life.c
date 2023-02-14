@@ -214,9 +214,10 @@ void plotGrid(void) {
     }
 }
 
-int runGeneration(bool (*callback_func)(void)) {
+bool runGeneration(bool (*callback_func)(void)) {
     bool keepgoing = true;
     // count neighbors
+    char ch = 0;
     for(int idx = 0; idx < 64 && cols_to_scan[idx] != (char) -1; idx++) {
         int x = cols_to_scan[idx];
         for(int idy = 0; idy < 48 && rows_to_scan[idy] != (char) -1; idy++) {
@@ -228,6 +229,11 @@ int runGeneration(bool (*callback_func)(void)) {
     char row_was_active[48];
     memset(col_was_active, 0, 64);
     memset(row_was_active, 0, 48);
+
+    // if(callback_func != NULL) {
+    //     // preserve support for callback function
+    //     keepgoing = callback_func();
+    // }
 
     // calculate next generation
     int x, y;
@@ -262,8 +268,57 @@ int runGeneration(bool (*callback_func)(void)) {
 
     memcpy(cols_to_scan, col_was_active, 64);
     memcpy(rows_to_scan, row_was_active, 48);
+    return keepgoing;
+}
+
+bool editGrid(void) {
     
-    return 1;
+    bool shouldKeepEditing = true;
+    bool shouldKeepRunning = true;
+    sprite_handle = vdp_sprite_init(0, 0, VDP_MAGENTA);
+    while (shouldKeepEditing) {
+        char key = getChar();
+
+        switch(key) {
+        case 'w':
+            cursor_y--;
+            if(cursor_y < 0) cursor_y = 0;
+            break;
+        case 'a':
+            cursor_x--;
+            if(cursor_x < 0) cursor_x = 0;
+            break;
+        case 's':
+            cursor_y++;
+            if(cursor_y > 47) cursor_y = 47;
+            break;
+        case 'd':
+            cursor_x++;
+            if(cursor_x > 63) cursor_x = 63;
+            break;
+        case ' ':
+            // update cell at current location
+            if(lifeGrid[cursor_x][cursor_y]) {
+                lifeGrid[cursor_x][cursor_y] = false;
+                vdp_plot_color(cursor_x, cursor_y, VDP_DARK_BLUE);
+            } else {
+                lifeGrid[cursor_x][cursor_y] = true;
+                vdp_plot_color(cursor_x, cursor_y, VDP_LIGHT_YELLOW);
+
+            }
+            break;
+        case 0x0d:  // ENTER or GO
+            shouldKeepEditing = false;
+            break;
+        }
+        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x), cursor_y_to_screen(cursor_y));
+
+    }
+    sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
+    vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x), cursor_y_to_screen(cursor_y));
+
+    initActiveRowsColsFromLifeGrid();
+    return shouldKeepRunning;
 }
 
 bool handle_input(void) {
@@ -333,7 +388,7 @@ bool handle_input(void) {
 
 
 void main2() {
-
+    char ch = 0;
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
@@ -343,7 +398,12 @@ void main2() {
     bool keepgoing = true;
     initGrid();
     plotGrid();
-    while (true) {
+    editGrid();
+    while (keepgoing) {
+        ch = isKeyPressed();
+        if(ch == ' ' || ch == 0x0d) { 
+            editGrid();
+        }
         runGeneration(NULL);
         setRowsToScan();
         setColsToScan();
