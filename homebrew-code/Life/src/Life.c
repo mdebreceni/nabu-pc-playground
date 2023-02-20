@@ -11,12 +11,12 @@
 // https://cloud.nabu.ca/homebrew/Hello-World-C.zip
 
 static void orgit() __naked { 
-	__asm 
-	org 0x140D 
-	nop 
-	nop 
-	nop 
-	__endasm; }
+    __asm 
+        org 0x140D 
+        nop 
+        nop 
+        nop 
+    __endasm; }
 
 void main2();
 
@@ -28,10 +28,9 @@ void main() { main2(); }
 #include <stdlib.h>
 #include <string.h>
 #include <z80.h>
+
 #include "nabu.h"
 #include "tms9918.h"
-
-#define MAX_ITERATION 50
 
 #define X_RES_PIXELS 64.0
 #define Y_RES_PIXELS 48.0
@@ -42,11 +41,12 @@ void main() { main2(); }
 #define SPRITE_LARGE true
 #define SPRITE_SMALL false
 
-uint8_t cursor_sprite_small[] = {0xf0, 0x90, 0x90, 0xf0, 0x00, 0x00, 0x00, 0x00};
+uint8_t cursor_sprite_small[] = {0xf0, 0x90, 0x90, 0xf0,
+                                 0x00, 0x00, 0x00, 0x00};
 
 int16_t sprite_handle = 0;
-int16_t cursor_x = 32;
-int16_t cursor_y = 24;
+int16_t cursor_x = X_RES_PIXELS / 2;
+int16_t cursor_y = Y_RES_PIXELS / 2;
 
 char lifeGrid[64][48];
 char neighborCount[64][48];
@@ -64,29 +64,33 @@ int16_t cursor_y_to_screen(int cursor_y) {
 }
 
 void centerCursor(void) {
-    cursor_x = 32;
-    cursor_y = 24;
-    vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x), cursor_y_to_screen(cursor_y));
+    cursor_x = X_RES_PIXELS / 2;
+    cursor_y = Y_RES_PIXELS / 2;
+    vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
+                            cursor_y_to_screen(cursor_y));
 }
 
 int countNeighbors(int x, int y) {
     // count neighbors for cell at position (x, y)
     // xn, yn are x,y of neighbor to test
-    // we will scan x-1,y-1 through x+1, y+1.  We will check that xn, yn are in bounds, and not the cell at x,y
-    // 
+    // we will scan x-1,y-1 through x+1, y+1.  We will check that xn, yn are in
+    // bounds, and not the cell at x,y
+    //
     // [   ][   ][   ]
     // [   ][x,y][   ]
     // [   ][   ][   ]
     int16_t neighbors = 0;
+    if(x < 0 || x > (X_RES_PIXELS - 1)) return 0;
+    if(y < 0 || y > (Y_RES_PIXELS - 1)) return 0;
     vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(x), cursor_y_to_screen(y));
-    // vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(0), cursor_y_to_screen(0));
 
-    for(int xn = x - 1; xn <= x + 1; xn++) {
-        for(int yn = y - 1; yn <= y + 1; yn++) {
-            if(xn != x || yn != y) {  
+    for (int xn = x - 1; xn <= x + 1; xn++) {
+        for (int yn = y - 1; yn <= y + 1; yn++) {
+            if (xn != x || yn != y) {
                 // don't count ourselves
-                if(xn >= 0 && xn < 64 && yn >= 0 && yn < 48) {// check if we're in bounds
-                    if(lifeGrid[xn][yn] == true) {
+                if (xn >= 0 && xn < 64 && yn >= 0 &&
+                    yn < Y_RES_PIXELS) {  // check if we're in bounds
+                    if (lifeGrid[xn][yn] == true) {
                         neighbors++;
                     }
                 }
@@ -97,82 +101,68 @@ int countNeighbors(int x, int y) {
 }
 
 void setRowsToScan(void) {
-    for(int y=0; y<47; y++) {
-        if(rows_to_scan[y+1]) rows_to_scan[y] = 1;
+    for (int y = 0; y < (Y_RES_PIXELS - 1); y++) {
+        if (rows_to_scan[y + 1]) rows_to_scan[y] = (char) 1;
     }
-    for(int y=47; y>0; y--) {
-        if(rows_to_scan[y-1]) rows_to_scan[y] = 1;
+    for (int y = (Y_RES_PIXELS - 1); y > 0; y--) {
+        if (rows_to_scan[y - 1]) rows_to_scan[y] = (char) 1;
     }
-
-    int idy = 0;
-    for(int y = 0; y < 48; y++) {
-        if(rows_to_scan[y]) {
-            rows_to_scan[idy++] = y;
-        }
-    }
-    rows_to_scan[idy] = (char) -1;
 
 }
 
 void plotRowsToScan(void) {
-    for(int y=0; y<48; y++) {
+    for (int y = 0; y < Y_RES_PIXELS; y++) {
         vdp_plot_color(0, y, VDP_DARK_BLUE);
     }
-    for(int idy=0; idy<48 && rows_to_scan[idy] != (char) -1; idy++) {
-        int y = rows_to_scan[idy];
-        vdp_plot_color(0, y, VDP_LIGHT_GREEN);
-
+    // for(int idy=0; idy<Y_RES_PIXELS && rows_to_scan[idy] != (char) -1; idy++) {
+    for (int y = 0; y < Y_RES_PIXELS; y++) {
+        if (rows_to_scan[y]) {
+            vdp_plot_color(0, y, VDP_LIGHT_GREEN);
+        }
     }
 }
 
 void setColsToScan(void) {
-    for (int x = 0; x<63; x++) {
-        if(cols_to_scan[x+1]) cols_to_scan[x] = 1;
+    // mark neighbors to left of marked columns
+    for (int x = 0; x < (X_RES_PIXELS - 1); x++) {
+        if (cols_to_scan[x + 1]) cols_to_scan[x] = 1;
     }
 
-    for (int x = 63; x>0; x--) {
-        if(cols_to_scan[x-1]) cols_to_scan[x] = 1;
+    // mark neighbors to right of marked colums
+    for (int x = (X_RES_PIXELS - 1); x > 0; x--) {
+        if (cols_to_scan[x - 1]) cols_to_scan[x] = 1;
     }
-
-    int idx = 0;
-    for(int x = 0; x < 64; x++) {
-        if(cols_to_scan[x]) {
-            cols_to_scan[idx++] = x;
-        }
-    }
-    cols_to_scan[idx] = (char) -1;
-
 }
 void plotColsToScan(void) {
-     for(int x=0; x<64; x++) {
+    for (int x = 0; x < 64; x++) {
         vdp_plot_color(x, 0, VDP_DARK_BLUE);
-     }
+    }
 
-    for(int idx=0; idx<64 && cols_to_scan[idx] != (char) -1; idx++) {
-        int x = cols_to_scan[idx];
-        vdp_plot_color(x, 0, VDP_LIGHT_GREEN); 
+    for (int x = 0; x < 64; x++) {
+        if (cols_to_scan[x]) {
+            vdp_plot_color(x, 0, VDP_LIGHT_GREEN);
+        }
     }
 }
 
-
 void initActiveRowsColsFromLifeGrid(void) {
-    memset(cols_to_scan, 0, 64);
-    memset(rows_to_scan, 0, 48);
+    memset(cols_to_scan, 0, X_RES_PIXELS);
+    memset(rows_to_scan, 0, Y_RES_PIXELS);
 
-    for (int x=0; x<64; x++) {
-        for(int y=0; y<64; y++) {
-            if(lifeGrid[x][y]) {
+    for (int x = 0; x < X_RES_PIXELS; x++) {
+        for (int y = 0; y < Y_RES_PIXELS; y++) {
+            if (lifeGrid[x][y]) {
                 cols_to_scan[x] = true;
                 rows_to_scan[y] = true;
             }
         }
-    }    
+    }
     setRowsToScan();
     setColsToScan();
 }
 
 void initGrid(void) {
-    memset(lifeGrid, 0, sizeof(lifeGrid));
+    memset(lifeGrid, 0, Y_RES_PIXELS * X_RES_PIXELS);
 
     // F pentomino
     lifeGrid[32][22] = true;
@@ -192,20 +182,20 @@ void initGrid(void) {
     // lifeGrid[13][21] = true;
     // lifeGrid[13][22] = true;
     // lifeGrid[13][23] = true;
-    
-    // Square 
+
+    // Square
     // lifeGrid[52][42] = true;
     // lifeGrid[53][42] = true;
     // lifeGrid[52][43] = true;
     // lifeGrid[53][43] = true;
 
-    initActiveRowsColsFromLifeGrid();    
+    initActiveRowsColsFromLifeGrid();
 }
 
 void plotGrid(void) {
-    for(int x=0; x<64; x++) {
-        for(int y=0; y<48; y++) {
-            if(lifeGrid[x][y]) {
+    for (int x = 0; x < X_RES_PIXELS; x++) {
+        for (int y = 0; y < Y_RES_PIXELS; y++) {
+            if (lifeGrid[x][y]) {
                 vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
             } else {
                 vdp_plot_color(x, y, VDP_DARK_BLUE);
@@ -216,106 +206,110 @@ void plotGrid(void) {
 
 bool runGeneration(bool (*callback_func)(void)) {
     bool keepgoing = true;
+    
+    char col_was_active[X_RES_PIXELS];
+    char row_was_active[Y_RES_PIXELS];
     // count neighbors
-    char ch = 0;
-    for(int idx = 0; idx < 64 && cols_to_scan[idx] != (char) -1; idx++) {
-        int x = cols_to_scan[idx];
-        for(int idy = 0; idy < 48 && rows_to_scan[idy] != (char) -1; idy++) {
-            int y = rows_to_scan[idy];
-            neighborCount[x][y] = countNeighbors(x,y);
-        }
-    }
-    char col_was_active[64];
-    char row_was_active[48];
-    memset(col_was_active, 0, 64);
-    memset(row_was_active, 0, 48);
-
-    // if(callback_func != NULL) {
-    //     // preserve support for callback function
-    //     keepgoing = callback_func();
-    // }
-
-    // calculate next generation
-    int x, y;
-    for (int idx = 0; idx < 64 && cols_to_scan[idx] != (char)-1; idx++) {
-        x = cols_to_scan[idx];
-        for (int idy = 0; idy < 48 && rows_to_scan[idy] != (char)-1; idy++) {
-            y = rows_to_scan[idy];
-            int c = neighborCount[x][y];
-            if (lifeGrid[x][y] == true) {
-                // cell is currently alive
-                // * If a cell is alive, it stays alive if it has 2 or 3
-                // neighbors
-                if (c < 2 || c > 3) {
-                    lifeGrid[x][y] = false;
-                    vdp_plot_color(x, y, VDP_DARK_BLUE);
-                    col_was_active[x] = true;
-                    row_was_active[y] = true;
-                }
-            } else {
-                // cell is dead.
-                // * If a cell is dead, it springs to life if it has 3
-                // neighbors
-                if (c == 3) {
-                    lifeGrid[x][y] = true;
-                    vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
-                    col_was_active[x] = true;
-                    row_was_active[y] = true;
+    for (int x = 0; x < X_RES_PIXELS; x++) {
+        if (cols_to_scan[x]) {
+            for (int y = 0; y < Y_RES_PIXELS; y++) {
+                if (rows_to_scan[y]) {
+                    neighborCount[x][y] = countNeighbors(x, y);
                 }
             }
         }
     }
 
-    memcpy(cols_to_scan, col_was_active, 64);
-    memcpy(rows_to_scan, row_was_active, 48);
+    memset(col_was_active, 0, X_RES_PIXELS);
+    memset(row_was_active, 0, Y_RES_PIXELS);
+
+    if(callback_func != NULL) {
+        // preserve support for callback function
+        keepgoing = callback_func();
+    }
+
+    // calculate next generation
+    for (int x = 0; x < X_RES_PIXELS; x++) {
+        if (cols_to_scan[x]) {
+            for (int y = 0; y < Y_RES_PIXELS; y++) {
+                if (rows_to_scan[y]) {
+                    int c = neighborCount[x][y];
+                    if (lifeGrid[x][y] == true) {
+                        // cell is currently alive
+                        // * If a cell is alive, it stays alive if it has 2 or 3
+                        // neighbors
+                        if (c < 2 || c > 3) {
+                            lifeGrid[x][y] = false;
+                            vdp_plot_color(x, y, VDP_DARK_BLUE);
+                            col_was_active[x] = true;
+                            row_was_active[y] = true;
+                        }
+                    } else {
+                        // cell is dead.
+                        // * If a cell is dead, it springs to life if it has 3
+                        // neighbors
+                        if (c == 3) {
+                            lifeGrid[x][y] = true;
+                            vdp_plot_color(x, y, VDP_LIGHT_YELLOW);
+                            col_was_active[x] = true;
+                            row_was_active[y] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
+    memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
     return keepgoing;
 }
 
 bool editGrid(void) {
-    
     bool shouldKeepEditing = true;
     bool shouldKeepRunning = true;
+    
     sprite_handle = vdp_sprite_init(0, 0, VDP_MAGENTA);
     while (shouldKeepEditing) {
         char key = getChar();
 
-        switch(key) {
-        case 'w':
-            cursor_y--;
-            if(cursor_y < 0) cursor_y = 0;
-            break;
-        case 'a':
-            cursor_x--;
-            if(cursor_x < 0) cursor_x = 0;
-            break;
-        case 's':
-            cursor_y++;
-            if(cursor_y > 47) cursor_y = 47;
-            break;
-        case 'd':
-            cursor_x++;
-            if(cursor_x > 63) cursor_x = 63;
-            break;
-        case ' ':
-            // update cell at current location
-            if(lifeGrid[cursor_x][cursor_y]) {
-                lifeGrid[cursor_x][cursor_y] = false;
-                vdp_plot_color(cursor_x, cursor_y, VDP_DARK_BLUE);
-            } else {
-                lifeGrid[cursor_x][cursor_y] = true;
-                vdp_plot_color(cursor_x, cursor_y, VDP_LIGHT_YELLOW);
-
-            }
-            break;
-        case 0x0d:  // ENTER or GO
-            shouldKeepEditing = false;
-            break;
+        switch (key) {
+            case 'w':
+                cursor_y--;
+                if (cursor_y < 0) cursor_y = 0;
+                break;
+            case 'a':
+                cursor_x--;
+                if (cursor_x < 0) cursor_x = 0;
+                break;
+            case 's':
+                cursor_y++;
+                if (cursor_y > (Y_RES_PIXELS - 1)) cursor_y = (Y_RES_PIXELS - 1);
+                break;
+            case 'd':
+                cursor_x++;
+                if (cursor_x > (X_RES_PIXELS - 1)) cursor_x = (X_RES_PIXELS - 1);
+                break;
+            case ' ':
+                // update cell at current location
+                if (lifeGrid[cursor_x][cursor_y]) {
+                    lifeGrid[cursor_x][cursor_y] = false;
+                    vdp_plot_color(cursor_x, cursor_y, VDP_DARK_BLUE);
+                } else {
+                    lifeGrid[cursor_x][cursor_y] = true;
+                    vdp_plot_color(cursor_x, cursor_y, VDP_LIGHT_YELLOW);
+                }
+                break;
+            case 0x0d:  // ENTER or GO
+                shouldKeepEditing = false;
+                break;
         }
-        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x), cursor_y_to_screen(cursor_y));
-
+        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
+                                cursor_y_to_screen(cursor_y));
     }
     sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
-    vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x), cursor_y_to_screen(cursor_y));
+    vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
+                            cursor_y_to_screen(cursor_y));
 
     initActiveRowsColsFromLifeGrid();
     return shouldKeepRunning;
@@ -335,10 +329,10 @@ bool handle_input(void) {
     if (stepSize < 1 || stepSize > 9) stepSize = 4;
 
     switch (key) {
-        // we will either be in run mode or edit mode.
-        // WASD and SPACE will work only in edit mode
-        // GO will toggle between run and edit mode
-        
+            // we will either be in run mode or edit mode.
+            // WASD and SPACE will work only in edit mode
+            // GO will toggle between run and edit mode
+
         case '1':
         case '2':
         case '3':
@@ -378,7 +372,7 @@ bool handle_input(void) {
 
         if (cursor_y <= 0) cursor_y = 0;
         if (cursor_y > 180) cursor_y = 180;
-        // vdp_sprite_set_position(sprite_handle, cursor_x, cursor_y);
+        vdp_sprite_set_position(sprite_handle, cursor_x, cursor_y);
     } else {
         stepSize = 4;
     }
@@ -386,27 +380,43 @@ bool handle_input(void) {
     return shouldKeepGoing;
 }
 
-
 void main2() {
     char ch = 0;
+    bool keepgoing = true;
+
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
     }
     sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
 
-    bool keepgoing = true;
     initGrid();
     plotGrid();
     editGrid();
-    while (keepgoing) {
-        ch = isKeyPressed();
-        if(ch == ' ' || ch == 0x0d) { 
-            editGrid();
+    int count=0;
+    while (keepgoing == true) {
+        count++;
+        vdp_plot_color(0, 0, VDP_CYAN);
+        // z80_delay_ms(500);
+        if(count % 1 == 0)  {
+            plotGrid();
+            vdp_plot_color(0, 0, VDP_LIGHT_RED);
+            isKeyPressed();
         }
+        if(count >= 100) count = 0;
+        vdp_plot_color(0, 0, VDP_DARK_RED);
+        // z80_delay_ms(500);
+        vdp_plot_color(0, 0, VDP_DARK_BLUE);
+        
+        // if (ch == ' ' || ch == 0x0d) {
+        // //     editGrid();
+        //     plotColsToScan();
+        //     plotRowsToScan();
+        // }
         runGeneration(NULL);
         setRowsToScan();
         setColsToScan();
+
         plotColsToScan();
         plotRowsToScan();
     }
