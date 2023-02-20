@@ -406,7 +406,7 @@ void main2() {
             // diagnostic red dot before calling isKeyPressed
             vdp_plot_color(0, 0, VDP_LIGHT_RED);   
             //  mysteriously crash Life by calling this
-            isKeyPressed();     
+            ch =isKeyPressed();     
         }
         if(count >= 100) count = 0;
         vdp_plot_color(0, 0, VDP_DARK_RED);
@@ -414,9 +414,9 @@ void main2() {
         vdp_plot_color(0, 0, VDP_DARK_BLUE);
         
         // Press Space or Go to enter editor
-        // if (ch == ' ' || ch == 0x0d) {
-        //     editGrid();
-        // }
+        if (ch == ' ' || ch == 0x0d) {
+            editGrid();
+        }
         runGeneration(NULL);
         setRowsToScan();
         setColsToScan();
