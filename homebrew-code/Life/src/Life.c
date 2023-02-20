@@ -316,6 +316,8 @@ bool editGrid(void) {
 }
 
 bool handle_input(void) {
+    // FIXME:  This is a callback that handles input, but is not actually used right now. Consider removing.
+    
     static uint8_t lastStatus;
     static uint8_t stepSize;
     char key = 0;
@@ -398,20 +400,22 @@ void main2() {
         count++;
         vdp_plot_color(0, 0, VDP_CYAN);
         // z80_delay_ms(500);
-        if(count % 1 == 0)  {
-            plotGrid();
-            vdp_plot_color(0, 0, VDP_LIGHT_RED);
-            isKeyPressed();
+        if(count % 2 == 0)  {  // debug - call isKeyPressed() less frequently to see if that helps
+            // force plotting of entire grid for debugging to detect scribbling on LifeGrid array - SLOW
+            // plotGrid();  
+            // diagnostic red dot before calling isKeyPressed
+            vdp_plot_color(0, 0, VDP_LIGHT_RED);   
+            //  mysteriously crash Life by calling this
+            isKeyPressed();     
         }
         if(count >= 100) count = 0;
         vdp_plot_color(0, 0, VDP_DARK_RED);
         // z80_delay_ms(500);
         vdp_plot_color(0, 0, VDP_DARK_BLUE);
         
+        // Press Space or Go to enter editor
         // if (ch == ' ' || ch == 0x0d) {
-        // //     editGrid();
-        //     plotColsToScan();
-        //     plotRowsToScan();
+        //     editGrid();
         // }
         runGeneration(NULL);
         setRowsToScan();
