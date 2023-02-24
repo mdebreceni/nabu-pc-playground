@@ -18,18 +18,18 @@ static void orgit() __naked {
         nop 
     __endasm; }
 
-void main2();
+// void main2();
 
-void main() { main2(); }
+// void main() { main2(); }
 
 #define FONT_STANDARD
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <z80.h>
+#include <stdbool.h>
+#include <arch/z80.h>
+#include <input.h>
 
-#include "nabu.h"
 #include "tms9918.h"
 
 #define X_RES_PIXELS 64.0
@@ -47,6 +47,11 @@ uint8_t cursor_sprite_small[] = {0xf0, 0x90, 0x90, 0xf0,
 int16_t sprite_handle = 0;
 int16_t cursor_x = X_RES_PIXELS / 2;
 int16_t cursor_y = Y_RES_PIXELS / 2;
+
+uchar in_KeyDebounce = 0;         // Number of ticks before a keypress is acknowledged. Set to 1 for no debouncing.
+uchar in_KeyStartRepeat = 20;     // Number of ticks after first time key is registered (after debouncing) before a key starts repeating.
+uchar in_KeyRepeatPeriod = 20;    // Repeat key rate measured in ticks.
+int in_KbdState;                  // Reserved variable holds in_GetKey() state
 
 char lifeGrid[64][48];
 char neighborCount[64][48];
@@ -271,7 +276,7 @@ bool editGrid(void) {
     
     sprite_handle = vdp_sprite_init(0, 0, VDP_MAGENTA);
     while (shouldKeepEditing) {
-        char key = getChar();
+        char key = in_Inkey();
 
         switch (key) {
             case 'w':
@@ -315,74 +320,8 @@ bool editGrid(void) {
     return shouldKeepRunning;
 }
 
-bool handle_input(void) {
-    // FIXME:  This is a callback that handles input, but is not actually used right now. Consider removing.
-    
-    static uint8_t lastStatus;
-    static uint8_t stepSize;
-    char key = 0;
-    char keypressed = isKeyPressed();
-    bool shouldKeepGoing = true;
 
-    if (keypressed) {
-        key = LastKeyPressed;
-    }
-
-    if (stepSize < 1 || stepSize > 9) stepSize = 4;
-
-    switch (key) {
-            // we will either be in run mode or edit mode.
-            // WASD and SPACE will work only in edit mode
-            // GO will toggle between run and edit mode
-
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-            stepSize = key - '0';
-            break;
-        case 'w':
-            cursor_y -= stepSize;
-            break;
-        case 'a':
-            cursor_x -= stepSize;
-            break;
-        case 's':
-            cursor_y += stepSize;
-            break;
-        case 'd':
-            cursor_x += stepSize;
-            break;
-        case ' ':
-            // update cell at current location
-            break;
-        case 0x0d:  // ENTER or GO
-            shouldKeepGoing = false;
-            break;
-        case 148:
-            LastKeyPressed = 148;
-            break;
-    }
-    if (shouldKeepGoing) {
-        if (cursor_x < 32) cursor_x = 32;
-        if (cursor_x >= 272) cursor_x = 272;
-
-        if (cursor_y <= 0) cursor_y = 0;
-        if (cursor_y > 180) cursor_y = 180;
-        vdp_sprite_set_position(sprite_handle, cursor_x, cursor_y);
-    } else {
-        stepSize = 4;
-    }
-
-    return shouldKeepGoing;
-}
-
-void main2() {
+int main(void) {
     char ch = 0;
     bool keepgoing = true;
 
@@ -400,13 +339,14 @@ void main2() {
         count++;
         vdp_plot_color(0, 0, VDP_CYAN);
         // z80_delay_ms(500);
-        if(count % 2 == 0)  {  // debug - call isKeyPressed() less frequently to see if that helps
+        if((count + 3)  % 19 == 0)  {  // debug - call isKeyPressed() less frequently to see if that helps
             // force plotting of entire grid for debugging to detect scribbling on LifeGrid array - SLOW
             // plotGrid();  
             // diagnostic red dot before calling isKeyPressed
-            vdp_plot_color(0, 0, VDP_LIGHT_RED);   
+            vdp_plot_color(0, 0, VDP_LIGHT_RED);  
+            z80_delay_ms(500); 
             //  mysteriously crash Life by calling this
-            ch =isKeyPressed();     
+            ch = in_Inkey();     
         }
         if(count >= 100) count = 0;
         vdp_plot_color(0, 0, VDP_DARK_RED);
