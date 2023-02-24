@@ -1,5 +1,5 @@
 // Life.c - John Conway's Game of Life, in 64x48 spelndor
-// mode Copyright Mike Debreceni 2023
+// Copyright Mike Debreceni 2023
 //
 // Rules:
 // * If a cell is alive, it stays alive if it has 2 or 3 neighbors
@@ -9,18 +9,6 @@
 //
 // https://nabu.ca/homebrew-c-tutorial
 // https://cloud.nabu.ca/homebrew/Hello-World-C.zip
-
-static void orgit() __naked { 
-    __asm 
-        org 0x140D 
-        nop 
-        nop 
-        nop 
-    __endasm; }
-
-// void main2();
-
-// void main() { main2(); }
 
 #define FONT_STANDARD
 #include <stdio.h>
@@ -151,14 +139,8 @@ void plotColsToScan(void) {
 }
 
 void initActiveRowsColsFromLifeGrid(void) {
-    for(int i=0; i<48; i++) {
-        rows_to_scan[i] = 0;
-    }
-    for(int i=0; i<64; i++) {
-        cols_to_scan[i] = 0;
-    }
-    //memset(cols_to_scan, 0, X_RES_PIXELS);
-    //memset(rows_to_scan, 0, Y_RES_PIXELS);
+    memset(cols_to_scan, 0, X_RES_PIXELS);
+    memset(rows_to_scan, 0, Y_RES_PIXELS);
 
     for (int x = 0; x < X_RES_PIXELS; x++) {
         for (int y = 0; y < Y_RES_PIXELS; y++) {
@@ -268,14 +250,10 @@ bool runGeneration(void) {
             }
         }
     }
-    for(int i=0; i<64; i++) {
-        cols_to_scan[i] = col_was_active[i]; 
-    }
-    for(int i=0; i<48; i++) {
-        rows_to_scan[i] = row_was_active[i];
-    }
-    //memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
-    //memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    
+    memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
+    memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    
     return keepgoing;
 }
 
@@ -290,19 +268,19 @@ bool editGrid(void) {
         char key = getk();
 
         switch (key) {
-            case 'w':
+            case 'w': case 'W':
                 cursor_y--;
                 if (cursor_y < 0) cursor_y = 0;
                 break;
-            case 'a':
+            case 'a': case 'A':
                 cursor_x--;
                 if (cursor_x < 0) cursor_x = 0;
                 break;
-            case 's':
+            case 's': case 'S':
                 cursor_y++;
                 if (cursor_y > (Y_RES_PIXELS - 1)) cursor_y = (Y_RES_PIXELS - 1);
                 break;
-            case 'd':
+            case 'd': case 'D':
                 cursor_x++;
                 if (cursor_x > (X_RES_PIXELS - 1)) cursor_x = (X_RES_PIXELS - 1);
                 break;
@@ -332,8 +310,6 @@ bool editGrid(void) {
 int main(void) {
     char ch = 0;
     bool keepgoing = true;
-    printf("Hey there!\n");
-    z80_delay_ms(2000);
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
@@ -343,28 +319,17 @@ int main(void) {
     initGrid();
     plotGrid();
     editGrid();
-    int count=0;
+
     while (keepgoing == true) {
-        count++;
         vdp_plot_color(0, 0, VDP_CYAN);
         // z80_delay_ms(500);
-        if((count + 3)  % 19 == 0)  {  // debug - call isKeyPressed() less frequently to see if that helps
-            // force plotting of entire grid for debugging to detect scribbling on LifeGrid array - SLOW
-            // plotGrid();  
-            // diagnostic red dot before calling isKeyPressed
-            vdp_plot_color(0, 0, VDP_LIGHT_RED);  
-            z80_delay_ms(500); 
-            //  mysteriously crash Life by calling this
+    	// mysteriously crash Life by calling this
             ch = getk();     
-        }
-        if(count >= 100) count = 0;
-        vdp_plot_color(0, 0, VDP_DARK_RED);
-        // z80_delay_ms(500);
-        vdp_plot_color(0, 0, VDP_DARK_BLUE);
         
         // Press Space or Go to enter editor
         if (ch == ' ' || ch == 0x0d) {
             editGrid();
+	    ch = 0;
         }
         
         runGeneration();
