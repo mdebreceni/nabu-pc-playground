@@ -417,6 +417,7 @@ void main2() {
         if (ch == ' ' || ch == 0x0d) {
             editGrid();
         }
+        
         runGeneration(NULL);
         setRowsToScan();
         setColsToScan();
