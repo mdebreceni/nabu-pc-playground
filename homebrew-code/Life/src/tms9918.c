@@ -21,7 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <z80.h>
+#include <arch/z80.h>
+#include <stdbool.h>
+#include "tms9918.h"
 #include "patterns.h"
 
 uint8_t _textBuffer[24 * 40]; // [row][col]
@@ -46,44 +48,41 @@ uint8_t _fgcolor;
 uint8_t _bgcolor;
 
 // Writes a byte to databus for register access
-inline void writePort(unsigned char value) {
+void writePort(unsigned char value) {
 
   z80_outp(0xA1, value);
 }
 
 // Reads a byte from databus for register access
-inline uint8_t read_status_reg() {
-
+uint8_t read_status_reg() {
   return z80_inp(0xa1);
 }
 
 // Writes a byte to databus for vram access
-inline void writeByteToVRAM(unsigned char value) {
+void writeByteToVRAM(unsigned char value) {
 
   z80_outp(0xA0, value);
 }
 
 // Reads a byte from databus for vram access
-inline unsigned char readByteFromVRAM() {
-
+unsigned char readByteFromVRAM() {
   return z80_inp(0xa0);
 }
 
-inline void setRegister(unsigned char registerIndex, unsigned char value) {
-
+void setRegister(unsigned char registerIndex, unsigned char value) {
   writePort(value);
 
   writePort(0x80 | registerIndex);
 }
 
-inline void setWriteAddress(unsigned int address) {
+void setWriteAddress(unsigned int address) {
 
   z80_outp(0xA1, address & 0xff);
 
   z80_outp(0xa1, 0x40 | (address >> 8) & 0x3f);
 }
 
-inline void setReadAddress(unsigned int address) {
+void setReadAddress(unsigned int address) {
 
   z80_outp(0xA1, address & 0xff);
 
@@ -528,13 +527,11 @@ uint8_t vdp_getCharAtLocationVRAM(uint8_t x, uint8_t y) {
   return readByteFromVRAM();
 }
 
-inline uint8_t vdp_getCharAtLocationBuf(uint8_t x, uint8_t y) {
-
+uint8_t vdp_getCharAtLocationBuf(uint8_t x, uint8_t y) {
   return _textBuffer[y * (_crsr_max_x + 1) + x];
 }
 
-inline void vdp_setCharAtLocationBuf(uint8_t x, uint8_t y, uint8_t c) {
-
+void vdp_setCharAtLocationBuf(uint8_t x, uint8_t y, uint8_t c) {
   _textBuffer[y * (_crsr_max_x + 1) + x] = c;
 }
 
