@@ -1,8 +1,6 @@
 #ifndef VDP_H
 #define VDP_H
 
-// typedef unsigned char bool;
-
 enum VDP_COLORS {
   VDP_TRANSPARENT = 0,
   VDP_BLACK = 1,
@@ -309,7 +307,5 @@ uint16_t vdp_sprite_init(uint8_t name, uint8_t priority, uint8_t color);
  * @returns     true: In case of a collision with other sprites
  */
 uint8_t vdp_sprite_set_position(uint16_t handle, uint16_t x, uint8_t y);
-
-// #include "tms9918.c"
 
 #endif

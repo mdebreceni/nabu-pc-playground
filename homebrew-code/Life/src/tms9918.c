@@ -55,7 +55,6 @@ void writePort(unsigned char value) {
 
 // Reads a byte from databus for register access
 uint8_t read_status_reg() {
-
   return z80_inp(0xa1);
 }
 
@@ -67,12 +66,10 @@ void writeByteToVRAM(unsigned char value) {
 
 // Reads a byte from databus for vram access
 unsigned char readByteFromVRAM() {
-
   return z80_inp(0xa0);
 }
 
 void setRegister(unsigned char registerIndex, unsigned char value) {
-
   writePort(value);
 
   writePort(0x80 | registerIndex);
@@ -531,12 +528,10 @@ uint8_t vdp_getCharAtLocationVRAM(uint8_t x, uint8_t y) {
 }
 
 uint8_t vdp_getCharAtLocationBuf(uint8_t x, uint8_t y) {
-
   return _textBuffer[y * (_crsr_max_x + 1) + x];
 }
 
 void vdp_setCharAtLocationBuf(uint8_t x, uint8_t y, uint8_t c) {
-
   _textBuffer[y * (_crsr_max_x + 1) + x] = c;
 }
 

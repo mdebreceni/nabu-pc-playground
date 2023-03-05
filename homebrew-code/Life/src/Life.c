@@ -151,8 +151,14 @@ void plotColsToScan(void) {
 }
 
 void initActiveRowsColsFromLifeGrid(void) {
-    memset(cols_to_scan, 0, X_RES_PIXELS);
-    memset(rows_to_scan, 0, Y_RES_PIXELS);
+    for(int i=0; i<48; i++) {
+        rows_to_scan[i] = 0;
+    }
+    for(int i=0; i<64; i++) {
+        cols_to_scan[i] = 0;
+    }
+    //memset(cols_to_scan, 0, X_RES_PIXELS);
+    //memset(rows_to_scan, 0, Y_RES_PIXELS);
 
     for (int x = 0; x < X_RES_PIXELS; x++) {
         for (int y = 0; y < Y_RES_PIXELS; y++) {
@@ -209,7 +215,7 @@ void plotGrid(void) {
     }
 }
 
-bool runGeneration(bool (*callback_func)(void)) {
+bool runGeneration(void) {
     bool keepgoing = true;
     
     char col_was_active[X_RES_PIXELS];
@@ -228,15 +234,13 @@ bool runGeneration(bool (*callback_func)(void)) {
     memset(col_was_active, 0, X_RES_PIXELS);
     memset(row_was_active, 0, Y_RES_PIXELS);
 
-    if(callback_func != NULL) {
-        // preserve support for callback function
-        keepgoing = callback_func();
-    }
-
     // calculate next generation
     for (int x = 0; x < X_RES_PIXELS; x++) {
+        // col_was_active[x] = true;
+
         if (cols_to_scan[x]) {
             for (int y = 0; y < Y_RES_PIXELS; y++) {
+                // row_was_active[y] = true;
                 if (rows_to_scan[y]) {
                     int c = neighborCount[x][y];
                     if (lifeGrid[x][y] == true) {
@@ -264,9 +268,14 @@ bool runGeneration(bool (*callback_func)(void)) {
             }
         }
     }
-
-    memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
-    memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    for(int i=0; i<64; i++) {
+        cols_to_scan[i] = col_was_active[i]; 
+    }
+    for(int i=0; i<48; i++) {
+        rows_to_scan[i] = row_was_active[i];
+    }
+    //memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
+    //memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
     return keepgoing;
 }
 
@@ -276,7 +285,9 @@ bool editGrid(void) {
     
     sprite_handle = vdp_sprite_init(0, 0, VDP_MAGENTA);
     while (shouldKeepEditing) {
-        char key = in_Inkey();
+        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
+                        cursor_y_to_screen(cursor_y));
+        char key = getk();
 
         switch (key) {
             case 'w':
@@ -309,8 +320,6 @@ bool editGrid(void) {
                 shouldKeepEditing = false;
                 break;
         }
-        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
-                                cursor_y_to_screen(cursor_y));
     }
     sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
     vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
@@ -320,11 +329,11 @@ bool editGrid(void) {
     return shouldKeepRunning;
 }
 
-
 int main(void) {
     char ch = 0;
     bool keepgoing = true;
-
+    printf("Hey there!\n");
+    z80_delay_ms(2000);
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
@@ -346,7 +355,7 @@ int main(void) {
             vdp_plot_color(0, 0, VDP_LIGHT_RED);  
             z80_delay_ms(500); 
             //  mysteriously crash Life by calling this
-            ch = in_Inkey();     
+            ch = getk();     
         }
         if(count >= 100) count = 0;
         vdp_plot_color(0, 0, VDP_DARK_RED);
@@ -357,7 +366,8 @@ int main(void) {
         if (ch == ' ' || ch == 0x0d) {
             editGrid();
         }
-        runGeneration(NULL);
+        
+        runGeneration();
         setRowsToScan();
         setColsToScan();
 
