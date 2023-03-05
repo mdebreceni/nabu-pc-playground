@@ -26,21 +26,22 @@ void ayWrite(uint8_t reg, uint8_t val) {
 
 uint8_t isKeyPressed() {
 
-  uint8_t status = z80_inp(KEYBOARD + 1);
 
+
+  uint8_t status = z80_inp(KEYBOARD + 1);
+  uint8_t retval = 0;
+  uint8_t inKey = 0;
   if (status & 0x02) {
 
-    uint8_t inKey = z80_inp(KEYBOARD);
+    inKey = z80_inp(KEYBOARD);
 
     if (inKey >= 0x90 && inKey <= 0x95)
-      return 0x00;
-
-    LastKeyPressed = inKey;
-
-    return inKey;
+      retval = 0x00;
+    else 
+      retval = inKey;
   }
 
-  return false;
+  return retval;;
 }
 
 uint8_t getChar() {
