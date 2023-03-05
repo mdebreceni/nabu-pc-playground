@@ -287,7 +287,7 @@ bool editGrid(void) {
     while (shouldKeepEditing) {
         vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
                         cursor_y_to_screen(cursor_y));
-        char key = in_Inkey();
+        char key = getk();
 
         switch (key) {
             case 'w':
@@ -332,7 +332,8 @@ bool editGrid(void) {
 int main(void) {
     char ch = 0;
     bool keepgoing = true;
-
+    printf("Hey there!\n");
+    z80_delay_ms(2000);
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
@@ -354,7 +355,8 @@ int main(void) {
             vdp_plot_color(0, 0, VDP_LIGHT_RED);  
             z80_delay_ms(500); 
             //  mysteriously crash Life by calling this
-            ch = in_Inkey();     
+            // ch = in_Inkey();
+            ch = getk();     
         }
         if(count >= 100) count = 0;
         vdp_plot_color(0, 0, VDP_DARK_RED);
