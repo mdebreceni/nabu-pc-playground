@@ -146,8 +146,14 @@ void plotColsToScan(void) {
 }
 
 void initActiveRowsColsFromLifeGrid(void) {
-    memset(cols_to_scan, 0, X_RES_PIXELS);
-    memset(rows_to_scan, 0, Y_RES_PIXELS);
+    for(int i=0; i<48; i++) {
+        rows_to_scan[i] = 0;
+    }
+    for(int i=0; i<64; i++) {
+        cols_to_scan[i] = 0;
+    }
+    //memset(cols_to_scan, 0, X_RES_PIXELS);
+    //memset(rows_to_scan, 0, Y_RES_PIXELS);
 
     for (int x = 0; x < X_RES_PIXELS; x++) {
         for (int y = 0; y < Y_RES_PIXELS; y++) {
@@ -225,8 +231,11 @@ bool runGeneration(void) {
 
     // calculate next generation
     for (int x = 0; x < X_RES_PIXELS; x++) {
+        // col_was_active[x] = true;
+
         if (cols_to_scan[x]) {
             for (int y = 0; y < Y_RES_PIXELS; y++) {
+                // row_was_active[y] = true;
                 if (rows_to_scan[y]) {
                     int c = neighborCount[x][y];
                     if (lifeGrid[x][y] == true) {
@@ -254,9 +263,14 @@ bool runGeneration(void) {
             }
         }
     }
-
-    memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
-    memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    for(int i=0; i<64; i++) {
+        cols_to_scan[i] = col_was_active[i]; 
+    }
+    for(int i=0; i<48; i++) {
+        rows_to_scan[i] = row_was_active[i];
+    }
+    //memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
+    //memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
     return keepgoing;
 }
 
@@ -266,7 +280,9 @@ bool editGrid(void) {
     
     sprite_handle = vdp_sprite_init(0, 0, VDP_MAGENTA);
     while (shouldKeepEditing) {
-        char key = getChar();
+        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
+                        cursor_y_to_screen(cursor_y));
+        char key = isKeyPressed();
 
         switch (key) {
             case 'w':
@@ -299,8 +315,6 @@ bool editGrid(void) {
                 shouldKeepEditing = false;
                 break;
         }
-        vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
-                                cursor_y_to_screen(cursor_y));
     }
     sprite_handle = vdp_sprite_init(0, 0, VDP_WHITE);
     vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
