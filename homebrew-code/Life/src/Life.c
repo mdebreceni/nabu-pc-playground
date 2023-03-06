@@ -1,5 +1,5 @@
 // Life.c - John Conway's Game of Life, in 64x48 spelndor
-// mode Copyright Mike Debreceni 2023
+// Copyright Mike Debreceni 2023
 //
 // Rules:
 // * If a cell is alive, it stays alive if it has 2 or 3 neighbors
@@ -10,26 +10,14 @@
 // https://nabu.ca/homebrew-c-tutorial
 // https://cloud.nabu.ca/homebrew/Hello-World-C.zip
 
-static void orgit() __naked { 
-    __asm 
-        org 0x140D 
-        nop 
-        nop 
-        nop 
-    __endasm; }
-
-void main2();
-
-void main() { main2(); }
-
 #define FONT_STANDARD
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <z80.h>
+#include <stdbool.h>
+#include <arch/z80.h>
+#include <input.h>
 
-#include "nabu.h"
 #include "tms9918.h"
 
 #define X_RES_PIXELS 64.0
@@ -47,6 +35,11 @@ uint8_t cursor_sprite_small[] = {0xf0, 0x90, 0x90, 0xf0,
 int16_t sprite_handle = 0;
 int16_t cursor_x = X_RES_PIXELS / 2;
 int16_t cursor_y = Y_RES_PIXELS / 2;
+
+uchar in_KeyDebounce = 0;         // Number of ticks before a keypress is acknowledged. Set to 1 for no debouncing.
+uchar in_KeyStartRepeat = 20;     // Number of ticks after first time key is registered (after debouncing) before a key starts repeating.
+uchar in_KeyRepeatPeriod = 20;    // Repeat key rate measured in ticks.
+int in_KbdState;                  // Reserved variable holds in_GetKey() state
 
 char lifeGrid[64][48];
 char neighborCount[64][48];
@@ -146,14 +139,8 @@ void plotColsToScan(void) {
 }
 
 void initActiveRowsColsFromLifeGrid(void) {
-    for(int i=0; i<48; i++) {
-        rows_to_scan[i] = 0;
-    }
-    for(int i=0; i<64; i++) {
-        cols_to_scan[i] = 0;
-    }
-    //memset(cols_to_scan, 0, X_RES_PIXELS);
-    //memset(rows_to_scan, 0, Y_RES_PIXELS);
+    memset(cols_to_scan, 0, X_RES_PIXELS);
+    memset(rows_to_scan, 0, Y_RES_PIXELS);
 
     for (int x = 0; x < X_RES_PIXELS; x++) {
         for (int y = 0; y < Y_RES_PIXELS; y++) {
@@ -210,7 +197,7 @@ void plotGrid(void) {
     }
 }
 
-bool runGeneration(bool (*callback_func)(void)) {
+bool runGeneration(void) {
     bool keepgoing = true;
     
     char col_was_active[X_RES_PIXELS];
@@ -226,19 +213,8 @@ bool runGeneration(bool (*callback_func)(void)) {
         }
     }
 
-    for(int i=0; i<64; i++) {
-        col_was_active[i] = 0;
-    }
-    for(int i=0; i<48; i++) {
-        row_was_active[i] = 0;
-    }
-//    memset(col_was_active, 0, X_RES_PIXELS);
-//    memset(row_was_active, 0, Y_RES_PIXELS);
-
-    if(callback_func != NULL) {
-        // preserve support for callback function
-        keepgoing = callback_func();
-    }
+    memset(col_was_active, 0, X_RES_PIXELS);
+    memset(row_was_active, 0, Y_RES_PIXELS);
 
     // calculate next generation
     for (int x = 0; x < X_RES_PIXELS; x++) {
@@ -274,14 +250,10 @@ bool runGeneration(bool (*callback_func)(void)) {
             }
         }
     }
-    for(int i=0; i<64; i++) {
-        cols_to_scan[i] = col_was_active[i]; 
-    }
-    for(int i=0; i<48; i++) {
-        rows_to_scan[i] = row_was_active[i];
-    }
-    //memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
-    //memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    
+    memcpy(cols_to_scan, col_was_active, X_RES_PIXELS);
+    memcpy(rows_to_scan, row_was_active, Y_RES_PIXELS);
+    
     return keepgoing;
 }
 
@@ -293,22 +265,22 @@ bool editGrid(void) {
     while (shouldKeepEditing) {
         vdp_sprite_set_position(sprite_handle, cursor_x_to_screen(cursor_x),
                         cursor_y_to_screen(cursor_y));
-        char key = isKeyPressed();
+        char key = getk();
 
         switch (key) {
-            case 'w':
+            case 'w': case 'W':
                 cursor_y--;
                 if (cursor_y < 0) cursor_y = 0;
                 break;
-            case 'a':
+            case 'a': case 'A':
                 cursor_x--;
                 if (cursor_x < 0) cursor_x = 0;
                 break;
-            case 's':
+            case 's': case 'S':
                 cursor_y++;
                 if (cursor_y > (Y_RES_PIXELS - 1)) cursor_y = (Y_RES_PIXELS - 1);
                 break;
-            case 'd':
+            case 'd': case 'D':
                 cursor_x++;
                 if (cursor_x > (X_RES_PIXELS - 1)) cursor_x = (X_RES_PIXELS - 1);
                 break;
@@ -335,77 +307,9 @@ bool editGrid(void) {
     return shouldKeepRunning;
 }
 
-bool handle_input(void) {
-    // FIXME:  This is a callback that handles input, but is not actually used right now. Consider removing.
-    
-    static uint8_t lastStatus;
-    static uint8_t stepSize;
-    char key = 0;
-    char keypressed = isKeyPressed();
-    bool shouldKeepGoing = true;
-
-    if (keypressed) {
-        key = LastKeyPressed;
-    }
-
-    if (stepSize < 1 || stepSize > 9) stepSize = 4;
-
-    switch (key) {
-            // we will either be in run mode or edit mode.
-            // WASD and SPACE will work only in edit mode
-            // GO will toggle between run and edit mode
-
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-            stepSize = key - '0';
-            break;
-        case 'w':
-            cursor_y -= stepSize;
-            break;
-        case 'a':
-            cursor_x -= stepSize;
-            break;
-        case 's':
-            cursor_y += stepSize;
-            break;
-        case 'd':
-            cursor_x += stepSize;
-            break;
-        case ' ':
-            // update cell at current location
-            break;
-        case 0x0d:  // ENTER or GO
-            shouldKeepGoing = false;
-            break;
-        case 148:
-            LastKeyPressed = 148;
-            break;
-    }
-    if (shouldKeepGoing) {
-        if (cursor_x < 32) cursor_x = 32;
-        if (cursor_x >= 272) cursor_x = 272;
-
-        if (cursor_y <= 0) cursor_y = 0;
-        if (cursor_y > 180) cursor_y = 180;
-        vdp_sprite_set_position(sprite_handle, cursor_x, cursor_y);
-    } else {
-        stepSize = 4;
-    }
-
-    return shouldKeepGoing;
-}
-
-void main2() {
+int main(void) {
     char ch = 0;
     bool keepgoing = true;
-
     vdp_init(VDP_MODE_MULTICOLOR, VDP_BLACK, SPRITE_SMALL, false);
     for (int i = 0; i < 256; i++) {
         vdp_set_sprite_pattern(i, cursor_sprite_small);
@@ -415,30 +319,20 @@ void main2() {
     initGrid();
     plotGrid();
     editGrid();
-    int count=0;
+
     while (keepgoing == true) {
-        count++;
         vdp_plot_color(0, 0, VDP_CYAN);
         // z80_delay_ms(500);
-        if(count % 1 == 0)  {  // debug - call isKeyPressed() less frequently to see if that helps
-            // force plotting of entire grid for debugging to detect scribbling on LifeGrid array - SLOW
-            // plotGrid();  
-            // diagnostic red dot before calling isKeyPressed
-            vdp_plot_color(0, 0, VDP_LIGHT_RED);   
-            //  mysteriously crash Life by calling this
-     //       ch = isKeyPressed();     
-        }
-        if(count >= 100) count = 0;
-        vdp_plot_color(0, 0, VDP_DARK_RED);
-        // z80_delay_ms(500);
-        vdp_plot_color(0, 0, VDP_DARK_BLUE);
+    	// mysteriously crash Life by calling this
+            ch = getk();     
         
         // Press Space or Go to enter editor
         if (ch == ' ' || ch == 0x0d) {
             editGrid();
+	    ch = 0;
         }
         
-        runGeneration(NULL);
+        runGeneration();
         setRowsToScan();
         setColsToScan();
 

@@ -8,8 +8,6 @@
 #define IOPORTA  0x0e
 #define IOPORTB  0x0f
 
-uint8_t LastKeyPressed = 0x00;
-
 inline void nop();
 
 void ayWrite(uint8_t reg, uint8_t val);
