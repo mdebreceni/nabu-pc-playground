@@ -1,8 +1,6 @@
 #ifndef VDP_H
 #define VDP_H
 
-// typedef unsigned char bool;
-
 enum VDP_COLORS {
   VDP_TRANSPARENT = 0,
   VDP_BLACK = 1,
