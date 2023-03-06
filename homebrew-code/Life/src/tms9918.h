@@ -310,6 +310,4 @@ uint16_t vdp_sprite_init(uint8_t name, uint8_t priority, uint8_t color);
  */
 uint8_t vdp_sprite_set_position(uint16_t handle, uint16_t x, uint8_t y);
 
-// #include "tms9918.c"
-
 #endif
